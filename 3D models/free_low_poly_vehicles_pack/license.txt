@@ -1,0 +1,11 @@
+Model Information:
+* title:	Free Low Poly Vehicles Pack
+* source:	https://sketchfab.com/3d-models/free-low-poly-vehicles-pack-cb7640039e7a40679a53be705ebff50e
+* author:	RgsDev (https://sketchfab.com/rgsdev)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Free Low Poly Vehicles Pack" (https://sketchfab.com/3d-models/free-low-poly-vehicles-pack-cb7640039e7a40679a53be705ebff50e) by RgsDev (https://sketchfab.com/rgsdev) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

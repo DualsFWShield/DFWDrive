@@ -6,7 +6,7 @@
 
 import { StorageService } from './storage.js';
 import { StatsEngine } from './stats.js';
-import { LEADERBOARD_USERS } from './data.js';
+import { LEADERBOARD_USERS, VEHICLE_3D_CATALOG } from './data.js';
 import { Vehicle3DRenderer } from './vehicle3d.js';
 
 export class UIController {
@@ -73,8 +73,46 @@ export class UIController {
     const btnTogglePanel = document.getElementById('btnToggleSidePanel');
     if (btnTogglePanel) {
       btnTogglePanel.addEventListener('click', () => {
-        this.mainPanel.classList.toggle('is-collapsed');
+        this.toggleMainPanel();
       });
+    }
+
+    // Close / Minimize Panel button
+    const btnCloseMain = document.getElementById('btnCloseMainPanel');
+    if (btnCloseMain) {
+      btnCloseMain.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleMainPanel(true);
+      });
+    }
+
+    // Floating Restore Panel button
+    const btnRestore = document.getElementById('btnRestorePanel');
+    if (btnRestore) {
+      btnRestore.addEventListener('click', () => {
+        this.toggleMainPanel(false);
+      });
+    }
+
+    // Tap or drag panel top bar to toggle / collapse
+    const panelTopControls = document.querySelector('.panel-top-controls');
+    if (panelTopControls) {
+      panelTopControls.addEventListener('click', (e) => {
+        if (e.target.closest('#btnCloseMainPanel')) return;
+        this.toggleMainPanel(true);
+      });
+
+      let startY = 0;
+      panelTopControls.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+
+      panelTopControls.addEventListener('touchmove', (e) => {
+        const deltaY = e.touches[0].clientY - startY;
+        if (deltaY > 35) {
+          this.toggleMainPanel(true);
+        }
+      }, { passive: true });
     }
 
     // Map Controls: Recenter GPS (Geolocalisation uniquement sur la carte)
@@ -121,17 +159,36 @@ export class UIController {
       });
     }
 
-    // Header active vehicle select
-    const headerVehSelect = document.getElementById('headerVehicleSelect');
-    if (headerVehSelect) {
-      headerVehSelect.addEventListener('change', (e) => {
-        StorageService.setActiveVehicle(e.target.value);
-        this.populateHeaderVehicles();
-        this.renderGarage();
-        this.update3DVehicleModel();
-        this.showToast('Véhicule actif sélectionné');
+    // Custom active vehicle dropdown toggle
+    const activeVehPill = document.getElementById('activeVehiclePill');
+    if (activeVehPill) {
+      activeVehPill.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleVehicleDropdown();
       });
     }
+
+    const btnDropdownAdd = document.getElementById('btnDropdownAddVeh');
+    if (btnDropdownAdd) {
+      btnDropdownAdd.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleVehicleDropdown(false);
+        this.addVehicleModal.classList.add('is-open');
+      });
+    }
+
+    // Close vehicle dropdown when clicking outside or pressing Escape
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#vehicleSelectorWrapper')) {
+        this.toggleVehicleDropdown(false);
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.toggleVehicleDropdown(false);
+      }
+    });
 
     // Start / Stop Real Drive
     const btnStartReal = document.getElementById('btnStartRealDrive');
@@ -301,20 +358,24 @@ export class UIController {
       addVehicleForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const type = document.getElementById('newVehType').value;
+        const model3d = document.getElementById('newVehModel3d')?.value || 'porsche';
         const make = document.getElementById('newVehMake').value.trim();
         const model = document.getElementById('newVehModel').value.trim();
         const year = parseInt(document.getElementById('newVehYear').value) || 2024;
         const odo = parseFloat(document.getElementById('newVehOdo').value) || 0;
 
+        const catalogModel = VEHICLE_3D_CATALOG.find(c => c.id === model3d);
         const emojis = { car: '🏎️', bike: '🚴', motorcycle: '🏍️', ebike: '⚡', other: '🛴' };
+        const emoji = catalogModel ? catalogModel.emoji : (emojis[type] || '🏎️');
 
         StorageService.addVehicle({
           type,
+          model3d,
           make,
           model,
           year,
           color: '#ff3b30',
-          emoji: emojis[type] || '🏎️',
+          emoji,
           odometer: odo,
           isPrimary: false
         });
@@ -324,6 +385,62 @@ export class UIController {
         this.populateHeaderVehicles();
         this.renderGarage();
         this.showToast(`Véhicule ${make} ${model} ajouté au garage !`);
+      });
+
+      // When 3D model changes in add vehicle dialog, auto-populate make & model if empty
+      const newVehModel3d = document.getElementById('newVehModel3d');
+      if (newVehModel3d) {
+        newVehModel3d.addEventListener('change', (e) => {
+          const found = VEHICLE_3D_CATALOG.find(c => c.id === e.target.value);
+          if (found) {
+            const makeInput = document.getElementById('newVehMake');
+            const modelInput = document.getElementById('newVehModel');
+            const typeSelect = document.getElementById('newVehType');
+            if (makeInput && (!makeInput.value || makeInput.value === 'Porsche')) {
+              makeInput.value = found.make;
+            }
+            if (modelInput && (!modelInput.value || modelInput.value === '911 GT3 RS')) {
+              modelInput.value = found.model;
+            }
+            if (typeSelect && found.type) {
+              typeSelect.value = found.type;
+            }
+          }
+        });
+      }
+    }
+
+    // 3D Vehicle Model Picker Modal Listeners
+    const btnCloseChoose3d = document.getElementById('btnCloseChoose3d');
+    const choose3dModal = document.getElementById('chooseVehicle3dModal');
+    if (btnCloseChoose3d && choose3dModal) {
+      btnCloseChoose3d.addEventListener('click', () => {
+        choose3dModal.classList.remove('is-open');
+      });
+      choose3dModal.addEventListener('click', (e) => {
+        if (e.target === choose3dModal) {
+          choose3dModal.classList.remove('is-open');
+        }
+      });
+    }
+
+    // 3D Model Category Filter Tabs
+    const model3dFilterTabs = document.getElementById('model3dFilterTabs');
+    if (model3dFilterTabs) {
+      model3dFilterTabs.querySelectorAll('.modal-filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          model3dFilterTabs.querySelectorAll('.modal-filter-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          this.render3dCatalogGrid(tab.dataset.category);
+        });
+      });
+    }
+
+    // Cockpit 3D Tag Click -> Quick 3D Switch
+    const cockpitTag = document.getElementById('cockpitVehicleTag');
+    if (cockpitTag) {
+      cockpitTag.addEventListener('click', () => {
+        this.openChoose3dModal();
       });
     }
 
@@ -352,25 +469,47 @@ export class UIController {
     }
   }
 
+  formatDistance(distKm, units = 'kmh') {
+    const val = Number(distKm) || 0;
+    if (units === 'mph') {
+      const mi = val * 0.621371;
+      return `${mi.toFixed(1)} mi`;
+    }
+    // Default metric
+    if (val > 0 && val < 1) {
+      return `${Math.round(val * 1000)} m`;
+    }
+    return `${val.toFixed(1)} km`;
+  }
+
+  formatSpeed(speedKmh, units = 'kmh') {
+    const val = Number(speedKmh) || 0;
+    if (units === 'mph') {
+      return `${Math.round(val * 0.621371)} mph`;
+    }
+    return `${Math.round(val)} km/h`;
+  }
+
   loadProfile() {
     const profile = StorageService.getProfile();
     const avatarEl = document.getElementById('headerProfileAvatar');
     if (avatarEl) avatarEl.textContent = profile.avatar || '🏎️';
 
-    const unitEls = [document.getElementById('statsDistUnit'), document.getElementById('liveSpeedUnit')];
-    unitEls.forEach(el => {
-      if (el) el.textContent = (profile.units || 'mph').toUpperCase();
-    });
+    const distUnitEl = document.getElementById('statsDistUnit');
+    if (distUnitEl) distUnitEl.textContent = profile.units === 'mph' ? 'MI' : 'KM';
+
+    const liveSpeedUnitEl = document.getElementById('liveSpeedUnit');
+    if (liveSpeedUnitEl) liveSpeedUnitEl.textContent = profile.units === 'mph' ? 'MPH' : 'KM/H';
 
     const speedUnitEl = document.getElementById('statsSpeedUnit');
-    if (speedUnitEl) speedUnitEl.textContent = profile.units || 'mph';
+    if (speedUnitEl) speedUnitEl.textContent = profile.units === 'mph' ? 'mph' : 'km/h';
   }
 
   openProfileModal() {
     const profile = StorageService.getProfile();
     document.getElementById('profileName').value = profile.name || '';
     document.getElementById('profileTag').value = profile.tag || '';
-    document.getElementById('profileUnits').value = profile.units || 'mph';
+    document.getElementById('profileUnits').value = profile.units || 'kmh';
     document.getElementById('profileBio').value = profile.bio || '';
 
     this.selectedAvatarEmoji = profile.avatar || '🏎️';
@@ -398,7 +537,23 @@ export class UIController {
       this.map.setDriveMode(true);
       this.update3DVehicleModel();
       this.updateGpsStatus(true, 'Enregistrement 3D');
-      document.getElementById('btnStartDriveLabel').textContent = 'Arrêter';
+
+      const badgeEl = document.getElementById('gpsStatusBadge');
+      if (badgeEl) {
+        badgeEl.style.display = 'none';
+        badgeEl.classList.add('is-hidden');
+      }
+
+      const btnStart = document.getElementById('btnStartRealDrive');
+      if (btnStart) {
+        btnStart.classList.add('is-recording');
+        btnStart.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="4" y="4" width="16" height="16" rx="3"/>
+          </svg>
+          <span id="btnStartDriveLabel">Arrêter</span>
+        `;
+      }
       this.showToast('Mode Conduite 3D activé');
     } else {
       this.showToast('Erreur GPS : vérifiez vos autorisations de localisation');
@@ -408,12 +563,14 @@ export class UIController {
   stopDriveSession() {
     if (this.tracker.isTracking) {
       const completed = this.tracker.stopTracking();
-      if (completed && completed.path.length > 2 && completed.distance > 0.01) {
+      const profile = StorageService.getProfile();
+      if (completed && completed.path.length > 2 && completed.distance > 0.005) {
         StorageService.addDrive(completed);
         this.renderDrivesList();
         this.updateQuickMiles();
         this.renderStats();
-        this.showToast(`Trajet de ${completed.distance} mi sauvegardé !`);
+        this.renderLeaderboards();
+        this.showToast(`Trajet de ${this.formatDistance(completed.distance, profile.units)} sauvegardé !`);
         this.openTripDetail(completed);
       } else {
         this.showToast('Session terminée (aucun déplacement enregistré)');
@@ -423,20 +580,60 @@ export class UIController {
     this.toggleCockpit(false);
     this.map.setDriveMode(false);
     this.vehicle3d.setSpeed(0);
-    this.updateGpsStatus(false, 'Auto-Détection Prête');
-    document.getElementById('btnStartDriveLabel').textContent = 'Démarrer le trajet';
+
+    const badgeEl = document.getElementById('gpsStatusBadge');
+    if (badgeEl) {
+      badgeEl.style.display = '';
+      badgeEl.classList.remove('is-hidden');
+    }
+
+    const btnStart = document.getElementById('btnStartRealDrive');
+    if (btnStart) {
+      btnStart.classList.remove('is-recording');
+      btnStart.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        <span id="btnStartDriveLabel">Démarrer</span>
+      `;
+    }
+  }
+
+  toggleMainPanel(forceCollapse = null) {
+    if (!this.mainPanel) return;
+    const isCurrentlyCollapsed = this.mainPanel.classList.contains('is-collapsed');
+    const shouldCollapse = forceCollapse !== null ? forceCollapse : !isCurrentlyCollapsed;
+
+    this.mainPanel.classList.toggle('is-collapsed', shouldCollapse);
+    document.body.classList.toggle('panel-collapsed', shouldCollapse);
+
+    const restorePill = document.getElementById('btnRestorePanel');
+    if (restorePill) {
+      restorePill.classList.toggle('show', shouldCollapse && !this.tracker.isTracking);
+    }
+
+    const btnToggle = document.getElementById('btnToggleSidePanel');
+    if (btnToggle) {
+      btnToggle.setAttribute('title', shouldCollapse ? 'Afficher le panneau' : 'Masquer le panneau');
+    }
+
+    if (this.map && this.map.map) {
+      setTimeout(() => this.map.map.resize(), 320);
+    }
   }
 
   toggleCockpit(show) {
     if (show) {
       this.driveCockpit.classList.add('is-active');
-      this.mainPanel.classList.add('is-collapsed');
+      this.toggleMainPanel(true);
+      const restorePill = document.getElementById('btnRestorePanel');
+      if (restorePill) restorePill.classList.remove('show');
       if (this.tripDrawer) this.tripDrawer.classList.remove('is-open');
       document.body.classList.remove('drawer-open');
       document.body.classList.add('in-drive-mode');
     } else {
       this.driveCockpit.classList.remove('is-active');
-      this.mainPanel.classList.remove('is-collapsed');
+      this.toggleMainPanel(false);
       document.body.classList.remove('in-drive-mode');
     }
   }
@@ -444,17 +641,25 @@ export class UIController {
   update3DVehicleModel() {
     const activeVeh = StorageService.getActiveVehicle();
     if (activeVeh && this.vehicle3d) {
-      this.vehicle3d.buildVehicle(activeVeh.type || 'car', 0xff3b30);
+      const modelId = activeVeh.model3d || (activeVeh.type === 'bike' ? 'bike' : activeVeh.type === 'motorcycle' ? 'motorcycle' : 'porsche');
+      this.vehicle3d.buildVehicle(modelId, 0xff3b30);
       const tag = document.getElementById('cockpitVehicleTag');
-      if (tag) tag.textContent = `${activeVeh.emoji} ${activeVeh.make} ${activeVeh.model}`;
+      if (tag) {
+        const catalogEntry = VEHICLE_3D_CATALOG.find(c => c.id === modelId);
+        const name = catalogEntry ? catalogEntry.name : `${activeVeh.make} ${activeVeh.model}`;
+        tag.textContent = `${activeVeh.emoji || '🏎️'} ${name}`;
+      }
+      if (this.map && this.map.setVehicleMarker) {
+        this.map.setVehicleMarker(activeVeh);
+      }
     }
   }
 
-  updateFuturisticSpeedometer(speedMph) {
+  updateFuturisticSpeedometer(speedKmh) {
     const profile = StorageService.getProfile();
-    const isKmh = profile.units === 'kmh';
-    const displaySpeed = isKmh ? Math.round(speedMph * 1.60934) : speedMph;
-    const maxSpeed = isKmh ? 240 : 160;
+    const isMph = profile.units === 'mph';
+    const displaySpeed = isMph ? Math.round(speedKmh * 0.621371) : Math.round(speedKmh);
+    const maxSpeed = isMph ? 160 : 240;
 
     // Center speed text
     const speedEl = document.getElementById('liveSpeedValue');
@@ -474,10 +679,10 @@ export class UIController {
       if (displaySpeed === 0) {
         paceEl.textContent = 'STANDBY';
         paceEl.style.color = '#8e95a5';
-      } else if (displaySpeed < (isKmh ? 50 : 30)) {
+      } else if (displaySpeed < (isMph ? 30 : 50)) {
         paceEl.textContent = 'CRUISE';
         paceEl.style.color = '#10b981';
-      } else if (displaySpeed < (isKmh ? 100 : 65)) {
+      } else if (displaySpeed < (isMph ? 65 : 100)) {
         paceEl.textContent = 'FLOW';
         paceEl.style.color = '#00f0ff';
       } else {
@@ -488,7 +693,7 @@ export class UIController {
 
     // Update 3D vehicle wheels
     if (this.vehicle3d) {
-      this.vehicle3d.setSpeed(speedMph);
+      this.vehicle3d.setSpeed(speedKmh);
     }
   }
 
@@ -500,16 +705,13 @@ export class UIController {
     const topEl = document.getElementById('liveTopSpeedVal');
 
     const profile = StorageService.getProfile();
-    const isKmh = profile.units === 'kmh';
 
     if (distEl && data.distance !== undefined) {
-      const distVal = isKmh ? (data.distance * 1.60934).toFixed(1) + ' km' : data.distance.toFixed(1) + ' mi';
-      distEl.textContent = distVal;
+      distEl.textContent = this.formatDistance(data.distance, profile.units);
     }
 
     if (topEl && data.topSpeed !== undefined) {
-      const topVal = isKmh ? Math.round(data.topSpeed * 1.60934) + ' km/h' : data.topSpeed + ' mph';
-      topEl.textContent = topVal;
+      topEl.textContent = this.formatSpeed(data.topSpeed, profile.units);
     }
 
     if (timeEl && data.elapsedSec !== undefined) {
@@ -524,6 +726,22 @@ export class UIController {
 
   switchTab(tabName) {
     this.activeTab = tabName;
+
+    // Restore panel if collapsed
+    if (this.mainPanel.classList.contains('is-collapsed')) {
+      this.toggleMainPanel(false);
+    }
+
+    const tabLabels = {
+      drives: 'Mes Trajets',
+      stats: 'Statistiques',
+      garage: 'Garage',
+      leaderboard: 'Classement'
+    };
+    const pillLabel = document.getElementById('restorePillLabel');
+    if (pillLabel && tabLabels[tabName]) {
+      pillLabel.textContent = tabLabels[tabName];
+    }
 
     this.tabButtons.forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tabName);
@@ -552,25 +770,69 @@ export class UIController {
   populateHeaderVehicles() {
     const vehicles = StorageService.getVehicles();
     const activeVeh = StorageService.getActiveVehicle();
+    const profile = StorageService.getProfile();
 
-    const select = document.getElementById('headerVehicleSelect');
-    const icon = document.getElementById('headerVehIcon');
+    const nameEl = document.getElementById('headerVehName');
+    const iconEl = document.getElementById('headerVehIcon');
+    const listEl = document.getElementById('vehicleDropdownList');
 
-    if (select) {
+    if (activeVeh) {
+      if (nameEl) nameEl.textContent = `${activeVeh.year} ${activeVeh.make} ${activeVeh.model}`;
+      if (iconEl) iconEl.textContent = activeVeh.emoji || '🏎️';
+    } else {
+      if (nameEl) nameEl.textContent = 'Ajouter un véhicule';
+      if (iconEl) iconEl.textContent = '🚗';
+    }
+
+    if (listEl) {
       if (vehicles.length === 0) {
-        select.innerHTML = '<option value="">Aucun véhicule</option>';
+        listEl.innerHTML = `
+          <div style="padding: 12px; font-size: 12px; color: var(--text-muted); text-align: center;">
+            Aucun véhicule enregistré.
+          </div>
+        `;
       } else {
-        select.innerHTML = vehicles.map(v => `
-          <option value="${v.id}" ${activeVeh && v.id === activeVeh.id ? 'selected' : ''}>
-            ${v.emoji} ${v.year} ${v.make} ${v.model}
-          </option>
-        `).join('');
+        listEl.innerHTML = vehicles.map(v => {
+          const isSelected = activeVeh && v.id === activeVeh.id;
+          return `
+            <div class="vehicle-dropdown-item ${isSelected ? 'is-selected' : ''}" data-veh-id="${v.id}">
+              <div class="item-left">
+                <span class="item-emoji">${v.emoji}</span>
+                <div class="item-info">
+                  <span class="item-model">${v.year} ${v.make} ${v.model}</span>
+                  <span class="item-meta">${v.type.toUpperCase()} · ${this.formatDistance(v.odometer, profile.units)}</span>
+                </div>
+              </div>
+              ${isSelected ? '<span class="item-check">✓</span>' : ''}
+            </div>
+          `;
+        }).join('');
+
+        listEl.querySelectorAll('.vehicle-dropdown-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const vehId = item.dataset.vehId;
+            StorageService.setActiveVehicle(vehId);
+            this.populateHeaderVehicles();
+            this.renderGarage();
+            this.update3DVehicleModel();
+            this.toggleVehicleDropdown(false);
+            this.showToast('Véhicule actif sélectionné');
+          });
+        });
       }
     }
+  }
 
-    if (icon) {
-      icon.textContent = activeVeh ? activeVeh.emoji : '🚗';
-    }
+  toggleVehicleDropdown(forceState = null) {
+    const pill = document.getElementById('activeVehiclePill');
+    const menu = document.getElementById('vehicleDropdownMenu');
+    if (!pill || !menu) return;
+
+    const isOpen = forceState !== null ? forceState : !menu.classList.contains('is-open');
+    pill.classList.toggle('is-open', isOpen);
+    pill.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    menu.classList.toggle('is-open', isOpen);
   }
 
   updateQuickMiles() {
@@ -578,11 +840,9 @@ export class UIController {
     const total = drives.reduce((acc, d) => acc + (d.distance || 0), 0);
     const pill = document.getElementById('quickTotalMiles');
     const profile = StorageService.getProfile();
-    const isKmh = profile.units === 'kmh';
 
     if (pill) {
-      const val = isKmh ? Math.round(total * 1.60934) + ' km' : Math.round(total) + ' mi';
-      pill.textContent = val;
+      pill.textContent = `${this.formatDistance(total, profile.units)} enregistrés`;
     }
   }
 
@@ -591,6 +851,7 @@ export class UIController {
     if (!container) return;
 
     let drives = StorageService.getDrives();
+    const profile = StorageService.getProfile();
 
     // Category filter
     if (this.activeVehicleFilter !== 'all') {
@@ -645,12 +906,12 @@ export class UIController {
                 <span class="veh-type-badge ${drive.vehicleType}">${badgeType}</span>
               </div>
               <div class="card-route-sub">${drive.startLocation || 'Départ'} → ${drive.endLocation || 'Arrivée'}</div>
-              <div class="card-stats-sub">${drive.distance} mi · ${Math.floor(drive.durationMinutes / 60)}h ${drive.durationMinutes % 60}m</div>
+              <div class="card-stats-sub">${this.formatDistance(drive.distance, profile.units)} · ${Math.floor(drive.durationMinutes / 60)}h ${drive.durationMinutes % 60}m</div>
             </div>
           </div>
           <div class="card-right-group">
-            <div class="card-speed-num ${isBike ? 'bike-speed' : ''}">${drive.topSpeed}</div>
-            <div class="card-speed-label">MPH MAX</div>
+            <div class="card-speed-num ${isBike ? 'bike-speed' : ''}">${this.formatSpeed(drive.topSpeed, profile.units).split(' ')[0]}</div>
+            <div class="card-speed-label">${profile.units === 'mph' ? 'MPH' : 'KM/H'} MAX</div>
           </div>
         </div>
       `;
@@ -722,12 +983,13 @@ export class UIController {
       roleSelect.value = drive.role || (drive.vehicleType === 'bike' ? 'Cyclist' : 'Driver');
     }
 
-    document.getElementById('detailDist').textContent = `${drive.distance} mi`;
+    const profile = StorageService.getProfile();
+    document.getElementById('detailDist').textContent = this.formatDistance(drive.distance, profile.units);
     const hrs = Math.floor(drive.durationMinutes / 60);
     const mins = drive.durationMinutes % 60;
     document.getElementById('detailDuration').textContent = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
-    document.getElementById('detailTopSpeed').textContent = `${drive.topSpeed} mph`;
-    document.getElementById('replayLiveSpeed').textContent = `${drive.topSpeed} mph`;
+    document.getElementById('detailTopSpeed').textContent = this.formatSpeed(drive.topSpeed, profile.units);
+    document.getElementById('replayLiveSpeed').textContent = this.formatSpeed(drive.topSpeed, profile.units);
 
     const dist = drive.speedDistribution || { under30: 0, range30to50: 0, range50to70: 0, range70to100: 0, over100: 0 };
     document.getElementById('distU30').style.width = `${dist.under30}%`;
@@ -750,10 +1012,11 @@ export class UIController {
   }
 
   updateTripDetailHeader(drive) {
+    const profile = StorageService.getProfile();
     const icon = drive.vehicleType === 'bike' ? '🚴' : drive.vehicleType === 'motorcycle' ? '🏍️' : '🏎️';
     document.getElementById('tripVehicleEmoji').textContent = icon;
     document.getElementById('tripDateTitle').textContent = drive.date;
-    document.getElementById('tripSubtitle').textContent = `${drive.distance} mi • ${drive.durationMinutes}m • ${drive.startLocation || 'DFW'}`;
+    document.getElementById('tripSubtitle').textContent = `${this.formatDistance(drive.distance, profile.units)} • ${drive.durationMinutes}m • ${drive.startLocation || 'DFWDrive'}`;
   }
 
   closeTripDetail() {
@@ -807,16 +1070,18 @@ export class UIController {
   setScrubber(progress) {
     this.playbackProgress = progress;
     if (this.selectedTrip) {
+      const profile = StorageService.getProfile();
       const livePt = this.map.setPlaybackProgress(this.selectedTrip, progress);
       if (livePt) {
-        document.getElementById('replayLiveSpeed').textContent = `${livePt.speed} mph`;
+        document.getElementById('replayLiveSpeed').textContent = this.formatSpeed(livePt.speed, profile.units);
       }
     }
   }
 
   handleShareTrip() {
     if (!this.selectedTrip) return;
-    const shareText = `🚗 DFWDrive : Trajet de ${this.selectedTrip.distance} mi avec ${this.selectedTrip.vehicleName} (Vmax : ${this.selectedTrip.topSpeed} mph) !`;
+    const profile = StorageService.getProfile();
+    const shareText = `🚗 DFWDrive : Trajet de ${this.formatDistance(this.selectedTrip.distance, profile.units)} avec ${this.selectedTrip.vehicleName} (Vmax : ${this.formatSpeed(this.selectedTrip.topSpeed, profile.units)}) !`;
     if (navigator.share) {
       navigator.share({
         title: 'DFWDrive Trip',
@@ -870,15 +1135,22 @@ export class UIController {
   renderStats() {
     const drives = StorageService.getDrives();
     const stats = StatsEngine.compute(drives, this.activeStatsMonth);
+    const profile = StorageService.getProfile();
 
     const totalDistEl = document.getElementById('statsTotalDistance');
     if (totalDistEl) totalDistEl.textContent = stats.totalDistance.toLocaleString();
 
+    const distUnitEl = document.getElementById('statsDistUnit');
+    if (distUnitEl) distUnitEl.textContent = profile.units === 'mph' ? 'mi' : 'km';
+
     const avgDistEl = document.getElementById('statsAvgDistance');
-    if (avgDistEl) avgDistEl.textContent = `${stats.avgDistance} mi`;
+    if (avgDistEl) avgDistEl.textContent = this.formatDistance(stats.avgDistance, profile.units);
 
     const topSpeedEl = document.getElementById('statsTopSpeed');
     if (topSpeedEl) topSpeedEl.textContent = stats.topSpeed;
+
+    const speedUnitEl = document.getElementById('statsSpeedUnit');
+    if (speedUnitEl) speedUnitEl.textContent = profile.units === 'mph' ? 'mph' : 'km/h';
 
     const milestonesContainer = document.getElementById('statsMilestonesList');
     if (milestonesContainer) {
@@ -909,12 +1181,12 @@ export class UIController {
               </div>
               <div>
                 <div style="font-size: 15px; font-weight: 800; color: #fff;">${ld.date.split(',')[0]}</div>
-                <div style="font-size: 12px; color: var(--text-muted);">${ld.distance} mi · ${Math.floor(ld.durationMinutes / 60)}h ${ld.durationMinutes % 60}m</div>
+                <div style="font-size: 12px; color: var(--text-muted);">${this.formatDistance(ld.distance, profile.units)} · ${Math.floor(ld.durationMinutes / 60)}h ${ld.durationMinutes % 60}m</div>
               </div>
             </div>
             <div style="text-align: right;">
               <div style="font-size: 20px; font-weight: 800; color: #ff9800;">${ld.topSpeed}</div>
-              <div style="font-size: 9px; font-weight: 700; color: var(--text-muted);">MPH MAX</div>
+              <div style="font-size: 9px; font-weight: 700; color: var(--text-muted);">${profile.units === 'mph' ? 'MPH' : 'KM/H'} MAX</div>
             </div>
           </div>
         `;
@@ -933,6 +1205,7 @@ export class UIController {
 
     const vehicles = StorageService.getVehicles();
     const activeVeh = StorageService.getActiveVehicle();
+    const profile = StorageService.getProfile();
 
     if (vehicles.length === 0) {
       container.innerHTML = `
@@ -947,6 +1220,10 @@ export class UIController {
 
     container.innerHTML = vehicles.map(v => {
       const isActive = activeVeh && v.id === activeVeh.id;
+      const model3dId = v.model3d || (v.type === 'bike' ? 'bike' : v.type === 'motorcycle' ? 'motorcycle' : 'porsche');
+      const catalogInfo = VEHICLE_3D_CATALOG.find(c => c.id === model3dId) || VEHICLE_3D_CATALOG[0];
+      const model3dName = catalogInfo ? catalogInfo.name : '3D Standard';
+
       return `
         <div class="garage-card ${isActive ? 'is-active' : ''}" data-veh-id="${v.id}">
           <div class="garage-card-header">
@@ -954,7 +1231,7 @@ export class UIController {
               <span class="veh-big-emoji">${v.emoji}</span>
               <div>
                 <div class="veh-title-text">${v.year} ${v.make} ${v.model}</div>
-                <div class="veh-sub-text">${v.type.toUpperCase()} · Odomètre : ${v.odometer.toLocaleString()} mi</div>
+                <div class="veh-sub-text">${v.type.toUpperCase()} · Odomètre : ${this.formatDistance(v.odometer, profile.units)}</div>
               </div>
             </div>
 
@@ -966,13 +1243,23 @@ export class UIController {
             </div>
           </div>
 
+          <div class="garage-3d-bar">
+            <div class="garage-3d-label">
+              <span>🏎️ Modèle 3D :</span>
+              <span class="garage-3d-tag">${model3dName}</span>
+            </div>
+            <button class="btn-change-3d-model" data-change-3d-id="${v.id}" type="button" title="Changer le modèle 3D de ce véhicule">
+              Modifier
+            </button>
+          </div>
+
           <div class="garage-stats-row">
             <div class="g-stat">
               <span class="g-stat-val">${v.totalDrives || 0}</span>
               <span class="g-stat-lbl">TRAJETS</span>
             </div>
             <div class="g-stat">
-              <span class="g-stat-val">${(v.totalDistance || 0).toLocaleString()} mi</span>
+              <span class="g-stat-val">${this.formatDistance(v.totalDistance || 0, profile.units)}</span>
               <span class="g-stat-lbl">DISTANCE</span>
             </div>
             <div class="g-stat">
@@ -984,9 +1271,17 @@ export class UIController {
       `;
     }).join('');
 
-    // Attach select & delete vehicle handlers
+    // Attach select, delete & 3D model change handlers
     container.querySelectorAll('.garage-card').forEach(card => {
       card.addEventListener('click', (e) => {
+        // Change 3D Model button
+        if (e.target.closest('.btn-change-3d-model')) {
+          e.stopPropagation();
+          const targetVehId = e.target.closest('.btn-change-3d-model').dataset.change3dId;
+          this.openChoose3dModal(targetVehId);
+          return;
+        }
+
         // If clicking delete button
         if (e.target.closest('.btn-delete-veh')) {
           e.stopPropagation();
@@ -1017,7 +1312,30 @@ export class UIController {
     const podiumContainer = document.getElementById('leaderboardPodium');
     if (!listContainer || !podiumContainer) return;
 
-    let users = [...LEADERBOARD_USERS];
+    const profile = StorageService.getProfile();
+    const drives = StorageService.getDrives();
+    const activeVeh = StorageService.getActiveVehicle();
+
+    // Calculate actual user statistics
+    const userTotalDistance = Number(drives.reduce((sum, d) => sum + (d.distance || 0), 0).toFixed(1));
+    const userActiveDays = Math.max(drives.length > 0 ? 1 : 0, new Set(drives.map(d => d.date?.split(',')[0])).size);
+    const userAvgSafety = drives.length > 0
+      ? Math.round(drives.reduce((sum, d) => sum + (d.safetyScore || 98), 0) / drives.length)
+      : 99;
+
+    const currentUser = {
+      id: 'current_user',
+      name: `${profile.name || 'Conducteur'} (Vous)`,
+      avatar: profile.avatar || '🏎️',
+      vehicle: activeVeh ? `${activeVeh.make} ${activeVeh.model}` : 'Véhicule',
+      category: activeVeh ? activeVeh.type : 'car',
+      totalDistance: userTotalDistance,
+      safeScore: userAvgSafety,
+      activeDays: userActiveDays,
+      isCurrent: true
+    };
+
+    let users = [currentUser, ...LEADERBOARD_USERS];
 
     if (this.activeLbTab === 'distance') {
       users.sort((a, b) => b.totalDistance - a.totalDistance);
@@ -1027,18 +1345,18 @@ export class UIController {
       users.sort((a, b) => b.activeDays - a.activeDays);
     }
 
-    const top3 = [users[1], users[0], users[2]];
+    const top3 = [users[1] || users[0], users[0], users[2] || users[0]];
     const podiumRanks = [2, 1, 3];
     const colClasses = ['second', 'first', 'third'];
 
     podiumContainer.innerHTML = top3.map((u, i) => {
       if (!u) return '';
       const metricVal = this.activeLbTab === 'distance'
-        ? `${u.totalDistance.toLocaleString()} mi`
+        ? this.formatDistance(u.totalDistance, profile.units)
         : this.activeLbTab === 'safety' ? `${u.safeScore} Pts` : `${u.activeDays} Jours`;
 
       return `
-        <div class="podium-col ${colClasses[i]}">
+        <div class="podium-col ${colClasses[i]} ${u.isCurrent ? 'is-me' : ''}">
           <div class="podium-avatar-ring">
             <div class="podium-avatar-circle">${u.avatar}</div>
             <div class="podium-rank-tag">${podiumRanks[i]}</div>
@@ -1051,7 +1369,7 @@ export class UIController {
 
     listContainer.innerHTML = users.slice(3).map((u, index) => {
       const metricVal = this.activeLbTab === 'distance'
-        ? `${u.totalDistance.toLocaleString()} mi`
+        ? this.formatDistance(u.totalDistance, profile.units)
         : this.activeLbTab === 'safety' ? `${u.safeScore} Pts` : `${u.activeDays} Jours`;
 
       return `
@@ -1068,6 +1386,87 @@ export class UIController {
         </div>
       `;
     }).join('');
+  }
+
+  openChoose3dModal(targetVehId = null) {
+    const modal = document.getElementById('chooseVehicle3dModal');
+    if (!modal) return;
+
+    const vehicles = StorageService.getVehicles();
+    const activeVeh = StorageService.getActiveVehicle();
+    const targetVeh = targetVehId ? vehicles.find(v => v.id === targetVehId) : activeVeh;
+    this.target3dVehicleId = targetVeh ? targetVeh.id : null;
+
+    // Reset filter tab active state
+    const filterTabsContainer = document.getElementById('model3dFilterTabs');
+    if (filterTabsContainer) {
+      filterTabsContainer.querySelectorAll('.modal-filter-tab').forEach((t, i) => {
+        t.classList.toggle('active', i === 0);
+      });
+    }
+
+    modal.classList.add('is-open');
+    this.render3dCatalogGrid('all');
+  }
+
+  render3dCatalogGrid(category = 'all') {
+    const grid = document.getElementById('vehicle3dGridList');
+    if (!grid) return;
+
+    const vehicles = StorageService.getVehicles();
+    const targetVeh = this.target3dVehicleId ? vehicles.find(v => v.id === this.target3dVehicleId) : StorageService.getActiveVehicle();
+    const currentModelId = targetVeh ? (targetVeh.model3d || 'porsche') : 'porsche';
+
+    let items = VEHICLE_3D_CATALOG;
+    if (category !== 'all') {
+      items = items.filter(m => m.category === category);
+    }
+
+    grid.innerHTML = items.map(model => {
+      const isSelected = model.id === currentModelId;
+      return `
+        <div class="veh-3d-card ${isSelected ? 'is-selected' : ''}" data-model-id="${model.id}">
+          <div>
+            <div class="veh-3d-card-top">
+              <div class="veh-3d-icon-badge">${model.emoji}</div>
+              <span class="veh-3d-pack-badge">${model.packLabel || 'Pack 3D'}</span>
+            </div>
+            <div class="veh-3d-info">
+              <div class="veh-3d-title">${model.name}</div>
+              <div class="veh-3d-category">${model.category}</div>
+              <div class="veh-3d-desc">${model.description}</div>
+            </div>
+          </div>
+          <button class="btn-select-3d-model" type="button">
+            ${isSelected ? '✓ Modèle Actif' : 'Sélectionner ce Modèle'}
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('.veh-3d-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const selectedModelId = card.dataset.modelId;
+        const catalogModel = VEHICLE_3D_CATALOG.find(m => m.id === selectedModelId);
+        if (!catalogModel) return;
+
+        if (this.target3dVehicleId) {
+          StorageService.updateVehicle(this.target3dVehicleId, {
+            model3d: catalogModel.id,
+            emoji: catalogModel.emoji || '🏎️'
+          });
+        }
+
+        const modal = document.getElementById('chooseVehicle3dModal');
+        if (modal) modal.classList.remove('is-open');
+
+        this.populateHeaderVehicles();
+        this.renderGarage();
+        this.update3DVehicleModel();
+        this.showToast(`Modèle 3D activé : ${catalogModel.name}`);
+      });
+    });
   }
 
   updateGpsStatus(isActive, text) {

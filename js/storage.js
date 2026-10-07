@@ -1,11 +1,11 @@
 import { INITIAL_VEHICLES, INITIAL_DRIVES, DEFAULT_USER_PROFILE } from './data.js';
 
 const STORAGE_KEYS = {
-  VEHICLES: 'dfwdrive_vehicles_v4',
-  DRIVES: 'dfwdrive_drives_v4',
-  ACTIVE_VEHICLE: 'dfwdrive_active_vehicle_v4',
-  USER_PROFILE: 'dfwdrive_profile_v4',
-  MAP_STYLE: 'dfwdrive_mapstyle_v4'
+  VEHICLES: 'dfwdrive_vehicles_v5',
+  DRIVES: 'dfwdrive_drives_v5',
+  ACTIVE_VEHICLE: 'dfwdrive_active_vehicle_v5',
+  USER_PROFILE: 'dfwdrive_profile_v5',
+  MAP_STYLE: 'dfwdrive_mapstyle_v5'
 };
 
 export class StorageService {
@@ -33,7 +33,16 @@ export class StorageService {
         localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(INITIAL_VEHICLES));
         return INITIAL_VEHICLES;
       }
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      // Ensure all vehicles have a valid model3d property
+      return parsed.map(v => {
+        if (!v.model3d) {
+          if (v.type === 'bike') v.model3d = 'bike';
+          else if (v.type === 'motorcycle') v.model3d = 'motorcycle';
+          else v.model3d = 'porsche';
+        }
+        return v;
+      });
     } catch {
       return INITIAL_VEHICLES;
     }
@@ -41,6 +50,17 @@ export class StorageService {
 
   static saveVehicles(vehicles) {
     localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(vehicles));
+  }
+
+  static updateVehicle(vehicleId, updates) {
+    const vehicles = this.getVehicles();
+    const index = vehicles.findIndex(v => v.id === vehicleId);
+    if (index !== -1) {
+      vehicles[index] = { ...vehicles[index], ...updates };
+      this.saveVehicles(vehicles);
+      return vehicles[index];
+    }
+    return null;
   }
 
   static getActiveVehicle() {

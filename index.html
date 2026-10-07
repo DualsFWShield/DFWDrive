@@ -22,6 +22,16 @@
   <!-- MapLibre GL CSS -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 
+  <!-- Three.js ES Modules Import Map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
   <!-- App Stylesheets -->
   <link rel="stylesheet" href="css/variables.css" />
   <link rel="stylesheet" href="css/styles.css" />
@@ -47,38 +57,51 @@
           </div>
         </div>
 
-        <!-- Active Vehicle Selector Pill -->
-        <div class="active-vehicle-pill" id="activeVehiclePill" title="Changer de véhicule actif">
-          <span class="veh-icon" id="headerVehIcon">🏎️</span>
-          <select id="headerVehicleSelect" class="header-veh-select"></select>
+        <!-- Active Vehicle Selector Pill (Custom Glass Dropdown) -->
+        <div class="vehicle-selector-wrapper" id="vehicleSelectorWrapper">
+          <button class="active-vehicle-pill" id="activeVehiclePill" type="button" aria-haspopup="listbox" aria-expanded="false" title="Changer de véhicule actif">
+            <span class="veh-icon" id="headerVehIcon">🏎️</span>
+            <span class="veh-name" id="headerVehName">Porsche 911 GT3 RS</span>
+            <svg class="veh-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <div class="vehicle-dropdown-menu" id="vehicleDropdownMenu" role="listbox">
+            <div class="vehicle-dropdown-list" id="vehicleDropdownList"></div>
+            <div class="vehicle-dropdown-footer">
+              <button class="btn-dropdown-add-veh" id="btnDropdownAddVeh" type="button">
+                <span>+</span> Ajouter un véhicule
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="header-right">
-        <!-- Theme Mode Toggle (Only in Action Bar / Header) -->
-        <button class="btn-header-icon" id="headerBtnTheme" title="Basculer Mode Sombre / Clair">
-          <span id="headerThemeIcon">🌙</span>
-        </button>
-
-        <!-- Force Cache Refresh Button (Remplace le bouton installer) -->
-        <button class="btn-header-icon" id="btnForceRefreshCache" title="Forcer la mise à jour du cache et recharger">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-          </svg>
-        </button>
-
         <!-- Live GPS Status Badge -->
-        <div class="gps-status-badge" id="gpsStatusBadge">
+        <div class="gps-status-badge" id="gpsStatusBadge" title="Statut GPS">
           <span class="status-pulse-dot"></span>
-          <span id="gpsStatusText">Auto-Détection Prête</span>
+          <span id="gpsStatusText">GPS Prêt</span>
         </div>
 
         <!-- Start Real Drive Button -->
         <button class="btn-header-action primary" id="btnStartRealDrive" title="Lancer l'enregistrement GPS du trajet">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <polygon points="5 3 19 12 5 21 5 3"/>
           </svg>
-          <span id="btnStartDriveLabel">Démarrer le trajet</span>
+          <span id="btnStartDriveLabel">Démarrer</span>
+        </button>
+
+        <!-- Theme Mode Toggle -->
+        <button class="btn-header-icon" id="headerBtnTheme" title="Basculer Mode Sombre / Clair">
+          <span id="headerThemeIcon">🌙</span>
+        </button>
+
+        <!-- Force Cache Refresh Button -->
+        <button class="btn-header-icon header-extra-btn" id="btnForceRefreshCache" title="Forcer la mise à jour du cache et recharger">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
         </button>
 
         <!-- User Profile Quick Button -->
@@ -96,9 +119,23 @@
       </div>
     </header>
 
+    <!-- Floating Bottom Bar to restore panel when collapsed on mobile -->
+    <button class="floating-panel-restore-pill" id="btnRestorePanel" title="Afficher les trajets et statistiques">
+      <span class="restore-pill-icon">🏎️</span>
+      <span class="restore-pill-text" id="restorePillLabel">Mes Trajets</span>
+      <span class="restore-pill-chevron">▲</span>
+    </button>
+
     <!-- Main Floating Glass Panel (Mobile Bottom-Sheet & Desktop Side Panel) -->
     <main class="main-panel" id="mainPanel">
-      <div class="panel-drag-bar" id="panelDragBar"></div>
+      <div class="panel-top-controls">
+        <div class="panel-drag-bar" id="panelDragBar" title="Toucher pour réduire / agrandir"></div>
+        <button class="btn-panel-close" id="btnCloseMainPanel" title="Fermer le panneau" aria-label="Fermer le panneau">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+      </div>
       
       <!-- Panel Header & Navigation Tabs -->
       <nav class="panel-nav">
@@ -153,7 +190,7 @@
               <p class="section-sub">Historique et Heatmap de conduite</p>
             </div>
             <div class="quick-stats-pill">
-              <span id="quickTotalMiles">0 mi</span> enregistrés
+              <span id="quickTotalMiles">0 km enregistrés</span>
             </div>
           </div>
 
@@ -205,9 +242,9 @@
             <div class="stat-hero-title">Distance Totale Parcourue</div>
             <div class="stat-hero-number">
               <span id="statsTotalDistance">0</span>
-              <span class="stat-hero-unit" id="statsDistUnit">mi</span>
+              <span class="stat-hero-unit" id="statsDistUnit">km</span>
             </div>
-            <div class="stat-hero-footnote">Distance moyenne par trajet : <span id="statsAvgDistance">0 mi</span></div>
+            <div class="stat-hero-footnote">Distance moyenne par trajet : <span id="statsAvgDistance">0 km</span></div>
           </div>
 
           <!-- Milestones Progress Bars -->
@@ -227,7 +264,7 @@
           <div class="speed-summary-card">
             <div class="block-title">Record de Vitesse Max</div>
             <div class="speed-big-val">
-              <span id="statsTopSpeed">0</span> <span class="unit" id="statsSpeedUnit">mph</span>
+              <span id="statsTopSpeed">0</span> <span class="unit" id="statsSpeedUnit">km/h</span>
             </div>
             <p class="speed-subtext">Vitesse maximale enregistrée lors de vos trajets.</p>
           </div>
@@ -285,7 +322,7 @@
           <span class="drawer-veh-badge" id="tripVehicleEmoji">🏎️</span>
           <div>
             <h3 class="drawer-trip-title" id="tripDateTitle">Trajet</h3>
-            <p class="drawer-trip-sub" id="tripSubtitle">0 mi • 0m</p>
+            <p class="drawer-trip-sub" id="tripSubtitle">0 km • 0m</p>
           </div>
         </div>
         <button class="btn-drawer-close" id="btnCloseTrip" title="Fermer">✕</button>
@@ -312,7 +349,7 @@
         <div class="metrics-triple-grid">
           <div class="metric-tile dist">
             <span class="tile-label">Distance</span>
-            <span class="tile-val" id="detailDist">0 mi</span>
+            <span class="tile-val" id="detailDist">0 km</span>
           </div>
 
           <div class="metric-tile time">
@@ -322,7 +359,7 @@
 
           <div class="metric-tile top">
             <span class="tile-label">Vitesse Max</span>
-            <span class="tile-val" id="detailTopSpeed">0 mph</span>
+            <span class="tile-val" id="detailTopSpeed">0 km/h</span>
           </div>
         </div>
 
@@ -351,15 +388,15 @@
               <div class="legend-num" id="val30_50">0%</div>
             </div>
             <div class="dist-legend-item">
-              <div class="legend-dot-label"><span class="dot c3"></span>50-70</div>
+              <div class="legend-dot-label"><span class="dot c3"></span>50-80</div>
               <div class="legend-num" id="val50_70">0%</div>
             </div>
             <div class="dist-legend-item">
-              <div class="legend-dot-label"><span class="dot c4"></span>70-100</div>
+              <div class="legend-dot-label"><span class="dot c4"></span>80-110</div>
               <div class="legend-num" id="val70_100">0%</div>
             </div>
             <div class="dist-legend-item">
-              <div class="legend-dot-label"><span class="dot c5"></span>100+</div>
+              <div class="legend-dot-label"><span class="dot c5"></span>110+</div>
               <div class="legend-num" id="valO100">0%</div>
             </div>
           </div>
@@ -369,7 +406,7 @@
         <div class="replay-controls-card">
           <div class="replay-top-label">
             <span>Relecture du Trajet</span>
-            <span id="replayLiveSpeed" style="font-weight: 800; color: #ff8800;">0 mph</span>
+            <span id="replayLiveSpeed" style="font-weight: 800; color: #ff8800;">0 km/h</span>
           </div>
 
           <div class="replay-bar">
@@ -422,7 +459,12 @@
             <span id="layoutToggleIcon">🔄</span>
             <span id="layoutToggleLabel">Mode Paysage</span>
           </button>
-          <button class="btn-cockpit-exit" id="btnEndDriveCockpit">Terminer</button>
+          <button class="btn-cockpit-exit" id="btnEndDriveCockpit">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+            </svg>
+            <span>Arrêter</span>
+          </button>
         </div>
       </div>
 
@@ -529,8 +571,8 @@
           <div class="form-group">
             <label class="form-label" for="profileUnits">Unité de vitesse &amp; distance</label>
             <select class="form-select" id="profileUnits">
+              <option value="kmh">KM/H (Kilomètres &amp; km/h) [Défaut]</option>
               <option value="mph">MPH (Miles &amp; Miles/h)</option>
-              <option value="kmh">KM/H (Kilomètres &amp; km/h)</option>
             </select>
           </div>
 
@@ -566,6 +608,39 @@
             </select>
           </div>
 
+          <div class="form-group">
+            <label class="form-label" for="newVehModel3d">Modèle 3D Réel (Route &amp; Carte)</label>
+            <select class="form-select" id="newVehModel3d">
+              <optgroup label="Supercars &amp; GT (Pack Ultime 2)">
+                <option value="porsche" selected>🏎️ Porsche 911 GT3 RS</option>
+                <option value="p1gtr">🚀 McLaren P1 GTR</option>
+                <option value="gtr">⚡ Nissan GT-R Nismo</option>
+                <option value="m8">🏎️ BMW M8 Competition</option>
+                <option value="mercedes">🏎️ Mercedes-AMG GT</option>
+                <option value="mustang">🏎️ Ford Mustang GT V8</option>
+                <option value="urus">🚙 Lamborghini Urus</option>
+              </optgroup>
+              <optgroup label="Voitures &amp; Séries (Pack Poly 1)">
+                <option value="roadster">🏎️ Roadster Sport Spyder</option>
+                <option value="sports">🏎️ Supercar Sport GT</option>
+                <option value="muscle">🏎️ Muscle Car V8 1969</option>
+                <option value="sedan">🚗 Berline Sport V6</option>
+                <option value="hatchback">🚗 Compacte Sportive Hot-Hatch</option>
+                <option value="suv">🚙 SUV Baroudeur 4x4</option>
+                <option value="pickup">🛻 Pickup Off-Road 4x4</option>
+              </optgroup>
+              <optgroup label="Véhicules Spéciaux (Pack Poly 1)">
+                <option value="taxi">🚕 Cyber Taxi Ville</option>
+                <option value="police">🚔 Police Interceptor</option>
+                <option value="monstertruck">🚜 Monster Truck Extrême</option>
+              </optgroup>
+              <optgroup label="Deux-Roues">
+                <option value="bike">🚴 Vélo de Route / Gravel 3D</option>
+                <option value="motorcycle">🏍️ Moto Superbike / Roadster 3D</option>
+              </optgroup>
+            </select>
+          </div>
+
           <div class="form-row-2">
             <div class="form-group">
               <label class="form-label" for="newVehMake">Marque</label>
@@ -597,6 +672,31 @@
       </div>
     </div>
 
+    <!-- 3D Vehicle Model Selector Modal Dialog -->
+    <div class="modal-dialog-backdrop" id="chooseVehicle3dModal">
+      <div class="modal-dialog-card modal-lg">
+        <div class="modal-header">
+          <div>
+            <h3 class="modal-title">Choisir le Modèle 3D</h3>
+            <p class="modal-sub">Sélectionnez le modèle 3D affiché sur la route en mode conduite et sur la carte</p>
+          </div>
+          <button class="btn-close-modal" id="btnCloseChoose3d" title="Fermer">✕</button>
+        </div>
+
+        <div class="modal-filter-tabs" id="model3dFilterTabs">
+          <button class="modal-filter-tab active" data-category="all">Tous</button>
+          <button class="modal-filter-tab" data-category="Supercars &amp; GT">🏎️ Supercars &amp; GT</button>
+          <button class="modal-filter-tab" data-category="Voitures &amp; Séries">🚗 Voitures</button>
+          <button class="modal-filter-tab" data-category="Véhicules Spéciaux">🚕 Spéciaux</button>
+          <button class="modal-filter-tab" data-category="Deux-Roues">🚴 Deux-Roues</button>
+        </div>
+
+        <div class="vehicle-3d-grid" id="vehicle3dGridList">
+          <!-- Dynamically populated cards -->
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification Popup -->
     <div class="toast-popup" id="toastNotice">
       <span class="toast-icon">🔔</span>
@@ -605,9 +705,8 @@
 
   </div>
 
-  <!-- MapLibre GL JS & Three.js Libraries -->
+  <!-- MapLibre GL JS Library -->
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 
   <!-- ES Modules Engine -->
   <script type="module" src="js/app.js"></script>

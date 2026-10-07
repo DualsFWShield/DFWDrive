@@ -3,7 +3,7 @@
  * Provides offline caching, lightning-fast boot times, and home-screen installation.
  */
 
-const CACHE_NAME = 'dfwdrive-cache-v1';
+const CACHE_NAME = 'dfwdrive-cache-v7';
 
 const STATIC_ASSETS = [
   './',
@@ -52,21 +52,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle local app shell with Cache-First strategy
+  // Handle local app shell with Network-First strategy (Cache fallback for offline)
   if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          // Revalidate in background
-          fetch(event.request).then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-            }
-          }).catch(() => {});
-          return cachedResponse;
-        }
-        return fetch(event.request);
-      })
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }

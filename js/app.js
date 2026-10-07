@@ -18,43 +18,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let uiCtrl;
 
-  // Initialize GPS/Simulation Tracker Engine
-  const trackerEngine = new TrackerEngine({
-    onTick: (metrics) => {
-      if (uiCtrl) {
-        uiCtrl.updateLiveHUDMetrics(metrics);
+    let lastHeading = 0;
+    const trackerEngine = new TrackerEngine({
+      onTick: (metrics) => {
+        if (uiCtrl) {
+          uiCtrl.updateLiveHUDMetrics(metrics);
+        }
+      },
+      onTripStart: (trip) => {
+        if (uiCtrl) {
+          uiCtrl.showToast(`Enregistrement du trajet démarré !`);
+        }
+      },
+      onTripEnd: (trip) => {
+        if (uiCtrl) {
+          const profile = StorageService.getProfile();
+          uiCtrl.showToast(`Trajet terminé : ${uiCtrl.formatDistance(trip.distance, profile.units)}`);
+          uiCtrl.renderDrivesList();
+          uiCtrl.updateQuickMiles();
+        }
+      },
+      onSpeedChange: (speed) => {
+        if (uiCtrl) {
+          uiCtrl.updateFuturisticSpeedometer(speed);
+        }
+      },
+      onLocationUpdate: (lat, lng, speed, path, heading) => {
+        if (heading !== undefined && heading !== null) {
+          lastHeading = heading;
+        } else if (speed > 1.5 && path && path.length >= 2) {
+          const p1 = path[path.length - 2];
+          const p2 = path[path.length - 1];
+          const y = Math.sin((p2[1] - p1[1]) * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180);
+          const x = Math.cos(p1[0] * Math.PI / 180) * Math.sin(p2[0] * Math.PI / 180) -
+                    Math.sin(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) * Math.cos((p2[1] - p1[1]) * Math.PI / 180);
+          lastHeading = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+        }
+        mapCtrl.updateLiveLocation(lat, lng, lastHeading, speed, path);
       }
-    },
-    onTripStart: (trip) => {
-      if (uiCtrl) {
-        uiCtrl.showToast(`Trip tracking started!`);
-      }
-    },
-    onTripEnd: (trip) => {
-      if (uiCtrl) {
-        uiCtrl.showToast(`Trip completed: ${trip.distance} mi`);
-        uiCtrl.renderDrivesList();
-        uiCtrl.updateQuickMiles();
-      }
-    },
-    onSpeedChange: (speed) => {
-      if (uiCtrl) {
-        uiCtrl.updateFuturisticSpeedometer(speed);
-      }
-    },
-    onLocationUpdate: (lat, lng, speed, path) => {
-      let heading = 0;
-      if (path && path.length >= 2) {
-        const p1 = path[path.length - 2];
-        const p2 = path[path.length - 1];
-        const y = Math.sin((p2[1] - p1[1]) * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180);
-        const x = Math.cos(p1[0] * Math.PI / 180) * Math.sin(p2[0] * Math.PI / 180) -
-                  Math.sin(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) * Math.cos((p2[1] - p1[1]) * Math.PI / 180);
-        heading = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-      }
-      mapCtrl.updateLiveLocation(lat, lng, heading, speed, path);
-    }
-  });
+    });
 
   // Initialize UI Controller
   uiCtrl = new UIController(mapCtrl, trackerEngine);

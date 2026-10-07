@@ -35,11 +35,11 @@ export class StatsEngine {
     // Compute cumulative speed distribution
     const speedDistribution = this.computeCumulativeDistribution(filteredDrives);
 
-    // Carbon savings for bike & ebike drives (~0.404 kg CO2 per mile compared to avg car)
+    // Carbon savings for bike & ebike drives (~0.21 kg CO2 per km compared to avg car)
     const bikeDistance = filteredDrives
       .filter(d => d.vehicleType === 'bike' || d.vehicleType === 'ebike')
       .reduce((sum, d) => sum + (d.distance || 0), 0);
-    const ecoCarbonSavedKg = Math.round(bikeDistance * 0.404);
+    const ecoCarbonSavedKg = Math.round(bikeDistance * 0.21);
 
     return {
       totalDistance: Math.round(totalDistance),
@@ -80,11 +80,17 @@ export class StatsEngine {
       return `${val.toFixed(2)}x`;
     };
 
-    const indyMult = totalDistance / MILESTONE_TARGETS.indy500.distanceMiles;
-    const coastMult = totalDistance / MILESTONE_TARGETS.coastToCoast.distanceMiles;
-    const earthMult = totalDistance / MILESTONE_TARGETS.aroundEarth.distanceMiles;
-    const moonMult = totalDistance / MILESTONE_TARGETS.toTheMoon.distanceMiles;
-    const tourMult = totalDistance / MILESTONE_TARGETS.tourDeFrance.distanceMiles;
+    const indyTarget = MILESTONE_TARGETS.indy500.distanceKm || 4.0;
+    const coastTarget = MILESTONE_TARGETS.coastToCoast.distanceKm || 1000.0;
+    const earthTarget = MILESTONE_TARGETS.aroundEarth.distanceKm || 40075.0;
+    const moonTarget = MILESTONE_TARGETS.toTheMoon.distanceKm || 384400.0;
+    const tourTarget = MILESTONE_TARGETS.tourDeFrance.distanceKm || 180.0;
+
+    const indyMult = totalDistance / indyTarget;
+    const coastMult = totalDistance / coastTarget;
+    const earthMult = totalDistance / earthTarget;
+    const moonMult = totalDistance / moonTarget;
+    const tourMult = totalDistance / tourTarget;
 
     return [
       {
