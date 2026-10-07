@@ -1,0 +1,59 @@
+:root {
+  /* Color Palette - Inspired by Wheelz */
+  --bg-primary: #08090c;
+  --bg-secondary: #111319;
+  --bg-tertiary: #181b24;
+  --bg-card: rgba(22, 25, 35, 0.85);
+  --bg-card-hover: rgba(30, 34, 48, 0.95);
+  --bg-glass: rgba(14, 16, 23, 0.78);
+  --bg-sheet: #0d0f15;
+
+  /* Accent Colors */
+  --accent-blue: #0084ff;
+  --accent-blue-glow: rgba(0, 132, 255, 0.35);
+  --accent-orange: #ff7700;
+  --accent-orange-glow: rgba(255, 119, 0, 0.35);
+  --accent-yellow: #f5a623;
+  --accent-green: #10b981;
+  --accent-purple: #8b5cf6;
+  --accent-red: #ef4444;
+  --accent-cyan: #06b6d4;
+
+  /* Speed distribution palette */
+  --speed-c1: #06b6d4; /* <30 mph / slow */
+  --speed-c2: #10b981; /* 30-50 mph */
+  --speed-c3: #f59e0b; /* 50-70 mph */
+  --speed-c4: #ff6b00; /* 70-100 mph */
+  --speed-c5: #ef4444; /* 100+ mph */
+
+  /* Text Colors */
+  --text-main: #ffffff;
+  --text-muted: #8e95a5;
+  --text-subtle: #575d6e;
+  --text-dark: #121316;
+
+  /* Borders & Dividers */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.14);
+  --border-focus: rgba(0, 132, 255, 0.5);
+
+  /* Shadows & Glassmorphism */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.75);
+  --shadow-glow: 0 0 25px rgba(0, 132, 255, 0.25);
+
+  /* Geometry & Typography */
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 9999px;
+
+  /* Layout Transitions */
+  --transition-fast: 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
