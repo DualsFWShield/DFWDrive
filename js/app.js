@@ -79,30 +79,40 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
-  // Handle PWA Installation Prompt
-  let deferredPrompt = null;
-  const btnInstall = document.getElementById('btnInstallPwa');
+  // Handle Force Cache Refresh & Update
+  const btnRefreshCache = document.getElementById('btnForceRefreshCache');
+  if (btnRefreshCache) {
+    btnRefreshCache.addEventListener('click', async () => {
+      if (uiCtrl) uiCtrl.showToast('Vidage du cache et actualisation...');
+      btnRefreshCache.classList.add('is-spinning');
 
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    if (btnInstall) {
-      btnInstall.style.display = 'flex';
-      btnInstall.addEventListener('click', async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted' && uiCtrl) {
-          uiCtrl.showToast('DFWDrive installé sur votre appareil !');
+      try {
+        // 1. Purge all Service Worker CacheStorage
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(key => caches.delete(key)));
         }
-        deferredPrompt = null;
-        btnInstall.style.display = 'none';
-      });
-    }
-  });
 
-  window.addEventListener('appinstalled', () => {
-    if (btnInstall) btnInstall.style.display = 'none';
-    if (uiCtrl) uiCtrl.showToast('Application DFWDrive installée !');
-  });
+        // 2. Unregister all active Service Workers to force fresh fetch
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(reg => reg.unregister()));
+        }
+
+        // 3. Purge MapController style memory cache
+        if (mapCtrl) {
+          mapCtrl.stylesCache = { dark: null, bright: null };
+        }
+
+        // 4. Trigger hard reload with timestamp to bypass HTTP cache
+        setTimeout(() => {
+          const cleanUrl = window.location.origin + window.location.pathname + '?reload=' + Date.now();
+          window.location.replace(cleanUrl);
+        }, 400);
+      } catch (err) {
+        console.warn('Cache purge error:', err);
+        window.location.reload();
+      }
+    });
+  }
 });

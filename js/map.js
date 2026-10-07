@@ -16,10 +16,15 @@ export class MapController {
     this.heatmapSourceId = 'dfwdrive-heatmap';
     this.activeDrives = [];
     this.playbackMarker = null;
+    this.stylesCache = { dark: null, bright: null };
   }
 
   init() {
     if (this.map || typeof maplibregl === 'undefined') return;
+
+    // Pre-fetch both style JSONs in background for instantaneous zero-latency theme switching
+    fetch('https://tiles.openfreemap.org/styles/dark').then(r => r.json()).then(j => { this.stylesCache.dark = j; }).catch(() => {});
+    fetch('https://tiles.openfreemap.org/styles/bright').then(r => r.json()).then(j => { this.stylesCache.bright = j; }).catch(() => {});
 
     // Check stored location or start centered, then immediately spawn on user GPS
     const defaultCenter = [-96.8047, 32.7885];
@@ -44,8 +49,13 @@ export class MapController {
       }
     });
 
+    // Synchronize 3D vehicle screen position continuously to keep it locked to road coordinates
+    this.map.on('move', () => this.syncVehicleScreenPosition());
+    this.map.on('render', () => this.syncVehicleScreenPosition());
+
     // Notify listeners when map zooms so 3D vehicle can dynamically match road scale
     this.map.on('zoom', () => {
+      this.syncVehicleScreenPosition();
       if (typeof this.onZoomChange === 'function') {
         this.onZoomChange(this.map.getZoom());
       }
@@ -61,6 +71,7 @@ export class MapController {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         this.userLocation = { lat: latitude, lng: longitude };
+        this.currentVehicleCoord = [longitude, latitude];
         if (this.map) {
           this.map.flyTo({
             center: [longitude, latitude],
@@ -70,6 +81,7 @@ export class MapController {
             essential: true
           });
         }
+        this.syncVehicleScreenPosition();
       },
       (err) => {
         console.warn('Auto GPS spawn fallback:', err);
@@ -81,20 +93,23 @@ export class MapController {
   setup3DBuildings() {
     if (!this.map) return;
 
-    // Configure realistic directional lighting for crisp 3D building shading
+    // Configure realistic directional lighting with viewport anchor and high zenith angle
+    // so ALL 4 sides of every building receive lighting and remain clearly distinguishable!
     try {
       this.map.setLight({
         anchor: 'viewport',
-        color: this.isDark ? '#b8c5db' : '#ffffff',
-        intensity: this.isDark ? 0.6 : 0.75,
-        position: [1.5, 210, 45]
+        color: '#ffffff',
+        intensity: this.isDark ? 0.85 : 0.95,
+        position: [1.15, 210, 22]
       });
     } catch (e) {
       console.warn('Map light setup:', e);
     }
 
-    // Check if 3D buildings layer already exists
-    if (this.map.getLayer('3d-buildings')) return;
+    // Safely remove existing layer if present to allow clean re-addition
+    if (this.map.getLayer('3d-buildings')) {
+      try { this.map.removeLayer('3d-buildings'); } catch (_) {}
+    }
 
     // Find symbol label layer to insert 3D buildings beneath street labels
     const layers = this.map.getStyle()?.layers || [];
@@ -106,6 +121,11 @@ export class MapController {
       }
     }
 
+    // Ensure openmaptiles vector source is present
+    if (!this.map.getSource('openmaptiles')) {
+      return;
+    }
+
     try {
       this.map.addLayer(
         {
@@ -113,32 +133,32 @@ export class MapController {
           source: 'openmaptiles',
           'source-layer': 'building',
           type: 'fill-extrusion',
-          minzoom: 13,
+          minzoom: 12,
           paint: {
             'fill-extrusion-color': [
               'interpolate',
               ['linear'],
-              ['coalesce', ['get', 'render_height'], ['get', 'height'], 16],
-              0, this.isDark ? '#222a3d' : '#e2e8f0',
-              25, this.isDark ? '#2e3952' : '#cbd5e1',
-              60, this.isDark ? '#3d4b6b' : '#94a3b8',
-              130, this.isDark ? '#536691' : '#64748b'
+              ['coalesce', ['get', 'render_height'], ['get', 'height'], 15],
+              0, this.isDark ? '#4a5d78' : '#cbd5e1',
+              25, this.isDark ? '#5c7396' : '#94a3b8',
+              60, this.isDark ? '#738eb8' : '#64748b',
+              130, this.isDark ? '#8fa9d4' : '#475569'
             ],
             'fill-extrusion-height': [
               'interpolate',
               ['linear'],
               ['zoom'],
-              13, 0,
-              14, ['coalesce', ['get', 'render_height'], ['get', 'height'], 16]
+              12, 0,
+              13.5, ['coalesce', ['get', 'render_height'], ['get', 'height'], 15]
             ],
             'fill-extrusion-base': [
               'interpolate',
               ['linear'],
               ['zoom'],
-              13, 0,
-              14, ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0]
+              12, 0,
+              13.5, ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0]
             ],
-            'fill-extrusion-opacity': 1.0 // 100% OPAQUE as requested
+            'fill-extrusion-opacity': 0.88 // Solid semi-opaque with distinct relief
           }
         },
         labelLayerId
@@ -387,12 +407,21 @@ export class MapController {
     if (!this.map) return;
 
     if (isActive) {
+      // Pin zoom around map center so scrolling mouse wheel does not shift vehicle off-road
+      this.map.scrollZoom.enable({ around: 'center' });
+      this.map.touchZoomRotate.enable({ around: 'center' });
       this.map.easeTo({
         pitch: 60,
-        zoom: 17,
+        zoom: 17.5,
         duration: 1000
       });
+      if (!this.map.getLayer('3d-buildings')) {
+        this.setup3DBuildings();
+      }
+      this.syncVehicleScreenPosition();
     } else {
+      this.map.scrollZoom.enable();
+      this.map.touchZoomRotate.enable();
       this.map.easeTo({
         pitch: 0,
         bearing: 0,
@@ -402,8 +431,21 @@ export class MapController {
     }
   }
 
+  syncVehicleScreenPosition() {
+    if (!this.map) return;
+    const coord = this.currentVehicleCoord || this.map.getCenter();
+    const pt = this.map.project(coord);
+    const container = document.getElementById('vehicle3dContainer');
+    if (container) {
+      container.style.left = `${Math.round(pt.x)}px`;
+      container.style.top = `${Math.round(pt.y)}px`;
+    }
+  }
+
   updateLiveLocation(lat, lng, heading = 0, speed = 0, path = []) {
     if (!this.map) return;
+    this.currentVehicleCoord = [lng, lat];
+    this.syncVehicleScreenPosition();
 
     if (this.isDriveMode) {
       this.map.easeTo({
@@ -470,21 +512,38 @@ export class MapController {
     );
   }
 
-  toggleTheme() {
+  async toggleTheme() {
     if (!this.map) return;
     this.isDark = !this.isDark;
-    const styleUrl = this.isDark 
-      ? 'https://tiles.openfreemap.org/styles/dark' 
-      : 'https://tiles.openfreemap.org/styles/bright';
+    const themeKey = this.isDark ? 'dark' : 'bright';
+    const styleUrl = `https://tiles.openfreemap.org/styles/${themeKey}`;
 
-    this.map.setStyle(styleUrl);
-    this.map.once('style.load', () => {
+    const applyNewThemeLayers = () => {
       this.setup3DBuildings();
       this.setupRouteLayers();
       if (this.activeDrives && this.activeDrives.length > 0) {
         this.renderHeatmap(this.activeDrives);
       }
-    });
+    };
+
+    try {
+      let styleData = this.stylesCache[themeKey];
+      if (!styleData) {
+        const res = await fetch(styleUrl);
+        styleData = await res.json();
+        this.stylesCache[themeKey] = styleData;
+      }
+
+      this.map.setStyle(styleData);
+      this.map.once('styledata', applyNewThemeLayers);
+      setTimeout(applyNewThemeLayers, 300);
+      setTimeout(applyNewThemeLayers, 800);
+    } catch (err) {
+      console.warn('Style fetch fallback:', err);
+      this.map.setStyle(styleUrl);
+      this.map.once('styledata', applyNewThemeLayers);
+      setTimeout(applyNewThemeLayers, 800);
+    }
 
     return this.isDark;
   }

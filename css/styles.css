@@ -33,9 +33,24 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Ensure 100% of button surface is clickable: all child icons, SVGs, spans delegate clicks to button */
-button * {
-  pointer-events: none;
+/* Ensure 100% of button & interactive surface is clickable */
+button *,
+.tab-btn *,
+.sort-chip *,
+.t-chip *,
+.lb-tab *,
+.map-ctrl-btn *,
+.btn-header-action *,
+.btn-header-icon *,
+.btn-profile-badge *,
+.btn-cockpit-layout *,
+.btn-cockpit-exit *,
+.btn-share-pill *,
+.btn-export-pill *,
+.btn-delete-trip *,
+.btn-close-modal *,
+.btn-drawer-close * {
+  pointer-events: none !important;
 }
 
 input, select, textarea {
@@ -323,6 +338,37 @@ body.drawer-open .map-floating-controls {
   background: rgba(255, 255, 255, 0.12);
 }
 
+#btnForceRefreshCache.is-spinning svg {
+  animation: spinCacheRefresh 0.8s linear infinite;
+  color: var(--accent-blue);
+}
+
+@keyframes spinCacheRefresh {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.btn-header-action:active,
+.btn-profile-badge:active,
+.btn-header-icon:active,
+.tab-btn:active,
+.btn-cockpit-exit:active,
+.btn-action-sm:active,
+.btn-delete-veh:active,
+.btn-delete-trip:active,
+.btn-primary-action:active,
+.btn-replay-play:active,
+.btn-close-modal:active,
+.btn-drawer-close:active,
+.btn-empty-start:active {
+  transform: scale(0.94) !important;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
 /* ==========================================================================
    Main Floating Glass Panel
    ========================================================================== */
@@ -349,6 +395,22 @@ body.drawer-open .map-floating-controls {
   transform: translateX(-110%);
   opacity: 0;
   pointer-events: none;
+}
+
+.panel-drag-bar {
+  display: none;
+  width: 36px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 8px auto 2px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .panel-drag-bar {
+    display: block;
+  }
 }
 
 .panel-nav {
@@ -1440,28 +1502,29 @@ body.drawer-open .map-floating-controls {
 }
 
 /* ==========================================================================
-   3D LIVE DRIVE COCKPIT (Map Visible Behind + 3D Vehicle + Futuristic Gauge)
+   3D LIVE DRIVE COCKPIT (Horizontal First, 3D Map Behind, Cyber HUD)
    ========================================================================== */
 .drive-3d-cockpit {
   position: absolute;
-  top: 64px;
+  top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: 150;
-  pointer-events: none; /* Keeps 3D map fully interactive beneath! */
-  display: flex;
+  pointer-events: none !important;
+  display: none !important;
   flex-direction: column;
   justify-content: space-between;
-  padding: 20px 24px;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  padding: 16px 24px;
+  box-sizing: border-box;
 }
 
 .drive-3d-cockpit.is-active {
-  opacity: 1;
-  transform: translateY(0);
+  display: flex !important;
+}
+
+.drive-3d-cockpit:not(.is-active) * {
+  pointer-events: none !important;
 }
 
 /* Top Cockpit Bar */
@@ -1469,16 +1532,24 @@ body.drawer-open .map-floating-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  pointer-events: auto;
+  padding-top: max(12px, env(safe-area-inset-top));
+  z-index: 20;
+}
+
+.drive-3d-cockpit.is-active .cockpit-top-bar,
+.drive-3d-cockpit.is-active .cluster-left-gauge,
+.drive-3d-cockpit.is-active .cluster-right-telemetry {
+  pointer-events: auto !important;
 }
 
 .cockpit-gps-pill {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(10, 14, 22, 0.85);
+  background: rgba(10, 14, 22, 0.88);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(16, 185, 129, 0.35);
   padding: 7px 16px;
   border-radius: var(--radius-pill);
   font-size: 12px;
@@ -1488,9 +1559,10 @@ body.drawer-open .map-floating-controls {
 }
 
 .cockpit-veh-tag {
-  background: rgba(10, 14, 22, 0.85);
+  background: rgba(10, 14, 22, 0.88);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   padding: 7px 16px;
   border-radius: var(--radius-pill);
   font-size: 13px;
@@ -1498,8 +1570,36 @@ body.drawer-open .map-floating-controls {
   color: #ffffff;
 }
 
+/* Cockpit Top Bar & Action Buttons */
+.cockpit-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-cockpit-layout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-cockpit-layout:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
 .btn-cockpit-exit {
-  background: rgba(239, 68, 68, 0.9);
+  background: rgba(239, 68, 68, 0.92);
   color: #ffffff;
   padding: 8px 18px;
   border-radius: var(--radius-pill);
@@ -1514,26 +1614,88 @@ body.drawer-open .map-floating-controls {
   transform: translateY(-1px);
 }
 
-/* 3D Simplified Vehicle Viewport (Three.js Canvas Container) */
+/* 3D Simplified Vehicle Viewport centered precisely on map canvas center (50%, 50%) */
 .vehicle-3d-viewport {
   position: absolute;
-  top: 45%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 380px;
-  height: 260px;
-  pointer-events: none;
+  width: 320px;
+  height: 240px;
+  pointer-events: none !important;
   z-index: 5;
 }
 
-/* Futuristic Needle-less Speedometer Dock */
-.futuristic-speedometer-dock {
+/* Horizontal First Cockpit Body Layout */
+.cockpit-cluster-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  pointer-events: none;
+  padding: 10px 16px;
+  position: relative;
+}
+
+/* Left Cluster: Needle-less Speedometer */
+.cluster-left-gauge {
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  z-index: 10;
+}
+
+/* Center road view */
+.cluster-center-road {
+  flex: 1;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Right Cluster: Telemetry Metrics */
+.cluster-right-telemetry {
   pointer-events: auto;
-  margin-top: auto;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  z-index: 10;
+}
+
+.telemetry-pill-card {
+  background: rgba(12, 16, 26, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 140px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  transition: all var(--transition-fast);
+}
+
+.telemetry-pill-card:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(18, 22, 34, 0.94);
+}
+
+.telemetry-pill-card .t-lbl {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.telemetry-pill-card .t-num {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 0.5px;
 }
 
 /* Cyber Radial HUD Dial (No Needles) */
@@ -1633,36 +1795,27 @@ body.drawer-open .map-floating-controls {
   margin-top: 6px;
 }
 
-/* Cockpit Floating Telemetry Pills */
-.cockpit-telemetry-strip {
-  display: flex;
+/* Vertical Cluster fallback (when toggled or narrow portrait) */
+.drive-3d-cockpit.vertical-cluster .cockpit-cluster-body {
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.drive-3d-cockpit.vertical-cluster .cluster-right-telemetry {
+  flex-direction: row;
+  justify-content: center;
   gap: 10px;
 }
 
-.telemetry-pill {
-  background: rgba(10, 14, 22, 0.85);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-pill);
-  padding: 6px 16px;
-  display: flex;
-  flex-direction: column;
+.drive-3d-cockpit.vertical-cluster .telemetry-pill-card {
   align-items: center;
   min-width: 90px;
+  padding: 8px 14px;
 }
 
-.t-lbl {
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-}
-
-.t-num {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 15px;
-  font-weight: 800;
-  color: #ffffff;
+.drive-3d-cockpit.vertical-cluster .telemetry-pill-card .t-num {
+  font-size: 16px;
 }
 
 /* ==========================================================================
@@ -1861,14 +2014,32 @@ body.drawer-open .map-floating-controls {
   opacity: 1;
 }
 
-/* Mobile Responsive */
+/* Mobile Responsive (Mobile First Bottom Sheet & Landscape Cockpit) */
 @media (max-width: 900px) {
   .app-header {
-    padding: 0 16px;
+    padding: 0 12px;
+    height: 56px;
   }
+
+  .brand-sub {
+    display: none;
+  }
+
   .active-vehicle-pill {
     display: none;
   }
+
+  .gps-status-badge {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .btn-header-action.primary {
+    padding: 7px 14px;
+    font-size: 12.5px;
+  }
+
+  /* Bottom sheet mobile navigation */
   .main-panel {
     top: auto;
     bottom: 0;
@@ -1876,9 +2047,19 @@ body.drawer-open .map-floating-controls {
     right: 0;
     width: 100%;
     max-width: 100%;
-    height: 56%;
+    height: 58%;
     border-radius: 28px 28px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+    transform: translateY(0);
+    transition: transform var(--transition-smooth), opacity var(--transition-smooth);
   }
+
+  .main-panel.is-collapsed {
+    transform: translateY(110%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
   .trip-detail-drawer {
     top: auto;
     bottom: 0;
@@ -1886,16 +2067,64 @@ body.drawer-open .map-floating-controls {
     right: 0;
     width: 100%;
     max-width: 100%;
-    height: 62%;
+    height: 64%;
     border-radius: 28px 28px 0 0;
     transform: translateY(110%);
   }
+
   .trip-detail-drawer.is-open {
     transform: translateY(0%);
   }
+
+  /* Floating GPS control on map floats directly above mobile bottom-sheet */
   .map-floating-controls {
-    bottom: auto;
-    top: 76px;
+    bottom: calc(58% + 14px);
     right: 16px;
+    top: auto;
+  }
+
+  .main-panel.is-collapsed ~ .map-floating-controls,
+  body.in-drive-mode .map-floating-controls {
+    bottom: 24px;
+  }
+}
+
+/* Horizontal-first Cockpit Optimizations for Landscape (Mobile or Desktop) */
+@media (orientation: landscape) and (max-height: 550px) {
+  .cockpit-top-bar {
+    padding-top: 4px;
+  }
+
+  .cyber-dial-wrap {
+    width: 180px;
+    height: 180px;
+  }
+
+  .dial-center-core {
+    width: 125px;
+    height: 125px;
+  }
+
+  .digital-speed-display {
+    font-size: 48px;
+  }
+
+  .digital-speed-unit {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+  }
+
+  .telemetry-pill-card {
+    padding: 8px 14px;
+    min-width: 110px;
+  }
+
+  .telemetry-pill-card .t-num {
+    font-size: 17px;
+  }
+
+  .vehicle-3d-viewport {
+    width: 260px;
+    height: 190px;
   }
 }

@@ -58,13 +58,16 @@ export class UIController {
   }
 
   bindEvents() {
-    // Navigation Tabs
-    this.tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = btn.dataset.tab;
-        this.switchTab(tab);
+    // Navigation Tabs with robust delegation
+    const panelNav = document.querySelector('.panel-nav');
+    if (panelNav) {
+      panelNav.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tab-btn');
+        if (btn && btn.dataset.tab) {
+          this.switchTab(btn.dataset.tab);
+        }
       });
-    });
+    }
 
     // Toggle Main Panel
     const btnTogglePanel = document.getElementById('btnToggleSidePanel');
@@ -74,42 +77,49 @@ export class UIController {
       });
     }
 
-    // Map Controls: Recenter GPS (Floating + Header)
-    const handleRecenter = () => {
-      this.showToast('Recherche de votre position GPS...');
-      this.map.recenterToUser(
-        (coords) => {
-          this.showToast('Position GPS actualisée !');
-        },
-        (msg) => {
-          this.showToast(msg);
-        }
-      );
-    };
-
+    // Map Controls: Recenter GPS (Geolocalisation uniquement sur la carte)
     const btnRecenter = document.getElementById('btnRecenterMap');
-    if (btnRecenter) btnRecenter.addEventListener('click', handleRecenter);
-    const headerBtnRecenter = document.getElementById('headerBtnRecenter');
-    if (headerBtnRecenter) headerBtnRecenter.addEventListener('click', handleRecenter);
+    if (btnRecenter) {
+      btnRecenter.addEventListener('click', () => {
+        this.showToast('Recherche de votre position GPS...');
+        this.map.recenterToUser(
+          (coords) => {
+            this.showToast('Position GPS actualisée !');
+          },
+          (msg) => {
+            this.showToast(msg);
+          }
+        );
+      });
+    }
 
-    // Map Controls: Toggle Theme Dark/Light (Floating + Header)
-    const handleThemeToggle = () => {
-      const isDark = this.map.toggleTheme();
-      const iconText = isDark ? '🌙' : '☀️';
-      const label = isDark ? 'Mode Nuit 3D activé' : 'Mode Jour 3D activé';
-      
-      const floatIcon = document.getElementById('floatThemeIcon');
-      if (floatIcon) floatIcon.textContent = iconText;
-      const headerIcon = document.getElementById('headerThemeIcon');
-      if (headerIcon) headerIcon.textContent = iconText;
-
-      this.showToast(label);
-    };
-
-    const btnThemeToggle = document.getElementById('btnToggleTileStyle');
-    if (btnThemeToggle) btnThemeToggle.addEventListener('click', handleThemeToggle);
+    // Header Action Bar: Toggle Theme Dark/Light (Thème uniquement dans la barre d'action)
     const headerBtnTheme = document.getElementById('headerBtnTheme');
-    if (headerBtnTheme) headerBtnTheme.addEventListener('click', handleThemeToggle);
+    if (headerBtnTheme) {
+      headerBtnTheme.addEventListener('click', async () => {
+        const isDark = await this.map.toggleTheme();
+        const iconText = isDark ? '🌙' : '☀️';
+        const label = isDark ? 'Mode Nuit 3D activé' : 'Mode Jour 3D activé';
+        
+        const headerIcon = document.getElementById('headerThemeIcon');
+        if (headerIcon) headerIcon.textContent = iconText;
+
+        this.showToast(label);
+      });
+    }
+
+    // Cockpit Layout Toggle (Paysage Horizontal / Portrait Vertical)
+    const btnLayout = document.getElementById('btnToggleCockpitLayout');
+    if (btnLayout) {
+      btnLayout.addEventListener('click', () => {
+        const isVert = this.driveCockpit.classList.toggle('vertical-cluster');
+        const icon = document.getElementById('layoutToggleIcon');
+        const label = document.getElementById('layoutToggleLabel');
+        if (icon) icon.textContent = isVert ? '↔️' : '🔄';
+        if (label) label.textContent = isVert ? 'Mode Paysage' : 'Mode Portrait';
+        this.showToast(isVert ? 'Disposition Verticale activée' : 'Disposition Horizontale activée');
+      });
+    }
 
     // Header active vehicle select
     const headerVehSelect = document.getElementById('headerVehicleSelect');
@@ -199,37 +209,43 @@ export class UIController {
       });
     }
 
-    const sortChips = document.querySelectorAll('.sort-chip');
-    sortChips.forEach(chip => {
-      chip.addEventListener('click', () => {
-        sortChips.forEach(c => c.classList.remove('active'));
+    const sortContainer = document.querySelector('.filter-sort-chips');
+    if (sortContainer) {
+      sortContainer.addEventListener('click', (e) => {
+        const chip = e.target.closest('.sort-chip');
+        if (!chip) return;
+        sortContainer.querySelectorAll('.sort-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         this.activeSortFilter = chip.dataset.sort;
         this.renderDrivesList();
       });
-    });
+    }
 
     // Time filter chips in Stats
-    const timeChips = document.querySelectorAll('.t-chip');
-    timeChips.forEach(chip => {
-      chip.addEventListener('click', () => {
-        timeChips.forEach(c => c.classList.remove('active'));
+    const timeContainer = document.querySelector('.time-filter-chips');
+    if (timeContainer) {
+      timeContainer.addEventListener('click', (e) => {
+        const chip = e.target.closest('.t-chip');
+        if (!chip) return;
+        timeContainer.querySelectorAll('.t-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         this.activeStatsMonth = chip.dataset.month;
         this.renderStats();
       });
-    });
+    }
 
     // Leaderboard category tabs
-    const lbTabs = document.querySelectorAll('.lb-tab');
-    lbTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        lbTabs.forEach(t => t.classList.remove('active'));
+    const lbContainer = document.querySelector('.lb-category-tabs');
+    if (lbContainer) {
+      lbContainer.addEventListener('click', (e) => {
+        const tab = e.target.closest('.lb-tab');
+        if (!tab) return;
+        lbContainer.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         this.activeLbTab = tab.dataset.tab;
         this.renderLeaderboards();
       });
-    });
+    }
 
     // Close Trip Detail Drawer
     const btnCloseTrip = document.getElementById('btnCloseTrip');

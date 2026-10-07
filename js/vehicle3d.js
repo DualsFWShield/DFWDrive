@@ -28,10 +28,10 @@ export class Vehicle3DRenderer {
     // Scene
     this.scene = new THREE.Scene();
 
-    // Camera (Isometric perspective looking slightly down and behind the vehicle)
-    this.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-    this.camera.position.set(0, 3.8, 6.2);
-    this.camera.lookAt(0, 0.6, 0);
+    // Camera aligned with MapLibre 60-degree road pitch looking at ground contact point (0, 0, 0)
+    this.camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
+    this.camera.position.set(0, 3.2, 5.5);
+    this.camera.lookAt(0, 0.0, 0);
 
     // Renderer with transparent background
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -72,18 +72,7 @@ export class Vehicle3DRenderer {
     this.vehicleGroup = new THREE.Group();
     this.wheels = [];
 
-    // Ground shadow attached directly to vehicle group for synchronous scaling
-    const shadowGeo = new THREE.PlaneGeometry(3.2, 4.8);
-    const shadowMat = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      opacity: 0.55
-    });
-    const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
-    shadowMesh.rotation.x = -Math.PI / 2;
-    shadowMesh.position.y = 0.02;
-    this.vehicleGroup.add(shadowMesh);
-
+    // Build stylized 3D vehicle model (no flat trapezoid ground plane artifact)
     if (type === 'bike') {
       this.buildBicycleModel(colorHex);
     } else if (type === 'motorcycle') {
@@ -102,12 +91,12 @@ export class Vehicle3DRenderer {
     if (!this.vehicleGroup) return;
     this.currentZoom = zoom;
 
-    // Road width roughly doubles per 1 level of MapLibre zoom.
-    // At drive zoom 17.5, roads are 25-35px wide. Base scale of ~0.38 fits a highway lane accurately.
+    // Web Mercator map scales by power of 2.0 per zoom level.
+    // Base scale at zoom 17.5: car is ~28px long x ~16px wide, perfectly inside a road lane.
     const zoomDelta = zoom - 17.5;
-    const factor = Math.pow(1.85, zoomDelta);
-    const base = this.currentType === 'bike' ? 0.32 : this.currentType === 'motorcycle' ? 0.35 : 0.38;
-    const targetScale = THREE.MathUtils.clamp(base * factor, 0.12, 1.25);
+    const factor = Math.pow(2.0, zoomDelta);
+    const base = this.currentType === 'bike' ? 0.14 : this.currentType === 'motorcycle' ? 0.18 : 0.24;
+    const targetScale = THREE.MathUtils.clamp(base * factor, 0.05, 1.25);
     this.vehicleGroup.scale.set(targetScale, targetScale, targetScale);
   }
 
@@ -139,42 +128,42 @@ export class Vehicle3DRenderer {
     // Cabin / Cockpit
     const cabinGeo = new THREE.BoxGeometry(1.3, 0.48, 1.8);
     const cabinMesh = new THREE.Mesh(cabinGeo, glassMat);
-    cabinMesh.position.set(0, 0.82, -0.2);
+    cabinMesh.position.set(0, 0.82, 0.2);
     this.vehicleGroup.add(cabinMesh);
 
-    // Front Hood Slope
+    // Front Hood Slope (Facing forward towards -Z)
     const hoodGeo = new THREE.BoxGeometry(1.4, 0.25, 1.1);
     const hoodMesh = new THREE.Mesh(hoodGeo, bodyMat);
-    hoodMesh.position.set(0, 0.55, 1.15);
-    hoodMesh.rotation.x = 0.12;
+    hoodMesh.position.set(0, 0.55, -1.15);
+    hoodMesh.rotation.x = -0.12;
     this.vehicleGroup.add(hoodMesh);
 
-    // Rear Spoiler
+    // Rear Spoiler (At rear +Z)
     const spoilerGeo = new THREE.BoxGeometry(1.5, 0.08, 0.35);
     const spoilerMesh = new THREE.Mesh(spoilerGeo, bodyMat);
-    spoilerMesh.position.set(0, 0.95, -1.6);
+    spoilerMesh.position.set(0, 0.95, 1.6);
     this.vehicleGroup.add(spoilerMesh);
 
-    // Headlights (Cyan LEDs)
+    // Headlights (Cyan LEDs facing forward along road -Z)
     const hlGeo = new THREE.BoxGeometry(0.3, 0.08, 0.1);
     const hlLeft = new THREE.Mesh(hlGeo, glowLedMat);
-    hlLeft.position.set(0.55, 0.48, 1.71);
+    hlLeft.position.set(0.55, 0.48, -1.71);
     const hlRight = new THREE.Mesh(hlGeo, glowLedMat);
-    hlRight.position.set(-0.55, 0.48, 1.71);
+    hlRight.position.set(-0.55, 0.48, -1.71);
     this.vehicleGroup.add(hlLeft, hlRight);
 
-    // Taillights (Red LED strip)
+    // Taillights (Red LED strip facing viewer +Z)
     const tlGeo = new THREE.BoxGeometry(1.4, 0.08, 0.1);
     const tlMesh = new THREE.Mesh(tlGeo, rearLedMat);
-    tlMesh.position.set(0, 0.52, -1.71);
+    tlMesh.position.set(0, 0.52, 1.71);
     this.vehicleGroup.add(tlMesh);
 
-    // Wheels
+    // Wheels (front at -Z, rear at +Z)
     const wheelPositions = [
-      [-0.85, 0.32, 1.05], // front-left
-      [0.85, 0.32, 1.05],  // front-right
-      [-0.85, 0.32, -1.05], // rear-left
-      [0.85, 0.32, -1.05]   // rear-right
+      [-0.85, 0.32, -1.05], // front-left
+      [0.85, 0.32, -1.05],  // front-right
+      [-0.85, 0.32, 1.05],  // rear-left
+      [0.85, 0.32, 1.05]    // rear-right
     ];
 
     wheelPositions.forEach(pos => {
@@ -197,21 +186,21 @@ export class Vehicle3DRenderer {
     this.vehicleGroup.add(topTube);
 
     const downTube = new THREE.Mesh(tubeGeo, frameMat);
-    downTube.rotation.x = -0.4;
-    downTube.position.set(0, 0.6, 0.2);
+    downTube.rotation.x = 0.4;
+    downTube.position.set(0, 0.6, -0.2);
     this.vehicleGroup.add(downTube);
 
-    // Handlebars
+    // Handlebars (Forward at -Z)
     const barGeo = new THREE.BoxGeometry(0.8, 0.05, 0.08);
     const barMesh = new THREE.Mesh(barGeo, metalMat);
-    barMesh.position.set(0, 1.15, 0.8);
+    barMesh.position.set(0, 1.15, -0.8);
     this.vehicleGroup.add(barMesh);
 
-    // Bicycle Wheels
+    // Bicycle Wheels (front at -Z, rear at +Z)
     const frontWheel = this.createWheel(0.55, 0.08);
-    frontWheel.position.set(0, 0.55, 0.95);
+    frontWheel.position.set(0, 0.55, -0.95);
     const rearWheel = this.createWheel(0.55, 0.08);
-    rearWheel.position.set(0, 0.55, -0.95);
+    rearWheel.position.set(0, 0.55, 0.95);
 
     this.vehicleGroup.add(frontWheel, rearWheel);
     this.wheels.push(frontWheel, rearWheel);
@@ -225,26 +214,26 @@ export class Vehicle3DRenderer {
     // Body tank & fairing
     const tankGeo = new THREE.BoxGeometry(0.6, 0.5, 1.4);
     const tankMesh = new THREE.Mesh(tankGeo, bodyMat);
-    tankMesh.position.set(0, 0.8, 0.1);
+    tankMesh.position.set(0, 0.8, -0.1);
     this.vehicleGroup.add(tankMesh);
 
-    // Front headlight
+    // Front headlight (Forward at -Z)
     const lightGeo = new THREE.BoxGeometry(0.25, 0.2, 0.1);
     const lightMesh = new THREE.Mesh(lightGeo, lightMat);
-    lightMesh.position.set(0, 0.85, 0.85);
+    lightMesh.position.set(0, 0.85, -0.85);
     this.vehicleGroup.add(lightMesh);
 
-    // Seat / Tail
+    // Seat / Tail (Rear at +Z)
     const seatGeo = new THREE.BoxGeometry(0.4, 0.2, 0.8);
     const seatMesh = new THREE.Mesh(seatGeo, darkMat);
-    seatMesh.position.set(0, 0.75, -0.6);
+    seatMesh.position.set(0, 0.75, 0.6);
     this.vehicleGroup.add(seatMesh);
 
-    // Wheels
+    // Wheels (front at -Z, rear at +Z)
     const frontWheel = this.createWheel(0.48, 0.18);
-    frontWheel.position.set(0, 0.48, 1.1);
+    frontWheel.position.set(0, 0.48, -1.1);
     const rearWheel = this.createWheel(0.48, 0.22);
-    rearWheel.position.set(0, 0.48, -1.0);
+    rearWheel.position.set(0, 0.48, 1.0);
 
     this.vehicleGroup.add(frontWheel, rearWheel);
     this.wheels.push(frontWheel, rearWheel);
@@ -285,11 +274,11 @@ export class Vehicle3DRenderer {
 
     if (!this.renderer || !this.scene || !this.camera) return;
 
-    // Spin wheels according to speed
+    // Spin wheels forward according to speed
     if (this.currentSpeed > 0 && this.wheels.length > 0) {
       const rotationSpeed = (this.currentSpeed / 45) * 0.35;
       this.wheels.forEach(w => {
-        w.rotation.x += rotationSpeed;
+        w.rotation.x -= rotationSpeed;
       });
     }
 
