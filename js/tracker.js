@@ -5,12 +5,13 @@
  */
 
 export class TrackerEngine {
-  constructor({ onTick, onTripStart, onTripEnd, onSpeedChange, onLocationUpdate }) {
+  constructor({ onTick, onTripStart, onTripEnd, onSpeedChange, onLocationUpdate, onAutoTripDetected }) {
     this.onTick = onTick;
     this.onTripStart = onTripStart;
     this.onTripEnd = onTripEnd;
     this.onSpeedChange = onSpeedChange;
     this.onLocationUpdate = onLocationUpdate;
+    this.onAutoTripDetected = onAutoTripDetected;
 
     this.isTracking = false;
     this.isSimulating = false;
@@ -25,6 +26,15 @@ export class TrackerEngine {
     this.lastLng = null;
     this.lastHeading = 0;
     this.compassHeading = 0;
+
+    // Auto-detection state
+    this.autoDetectWatchId = null;
+    this.autoDetectConsecutive = 0;  // consecutive readings above speed threshold
+    this.autoDetectBufferedPoints = []; // buffer GPS points before trip confirmed
+    this.autoStopTimer = null;       // timer for 4-min stillness auto-stop
+    this.AUTO_START_THRESHOLD_KMH = 8;  // min speed to consider movement
+    this.AUTO_START_CONSECUTIVE = 3;    // readings needed before trip auto-starts
+    this.AUTO_STOP_MS = 4 * 60 * 1000; // 4 minutes of stillness -> auto-stop
 
     this.initCompass();
   }
@@ -50,6 +60,92 @@ export class TrackerEngine {
       window.addEventListener('deviceorientationabsolute', handleOrientation, true);
     } else if ('ondeviceorientation' in window) {
       window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+  }
+
+  /**
+   * Passive auto-detection: watches GPS silently, auto-starts/stops trip.
+   * Should be called once at app init after GPS permission is granted.
+   */
+  startPassiveAutoDetection(vehicle) {
+    if (!('geolocation' in navigator) || this.autoDetectWatchId !== null) return;
+
+    this.autoDetectVehicle = vehicle;
+    this.autoDetectConsecutive = 0;
+    this.autoDetectBufferedPoints = [];
+
+    this.autoDetectWatchId = navigator.geolocation.watchPosition(
+      (pos) => this._handleAutoDetectUpdate(pos),
+      (err) => console.warn('Auto-detect GPS error:', err),
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 }
+    );
+  }
+
+  stopPassiveAutoDetection() {
+    if (this.autoDetectWatchId !== null) {
+      navigator.geolocation.clearWatch(this.autoDetectWatchId);
+      this.autoDetectWatchId = null;
+    }
+    this._clearAutoStopTimer();
+  }
+
+  _handleAutoDetectUpdate(position) {
+    if (!position?.coords) return;
+    if (this.isTracking) return; // already in an active trip
+
+    const { latitude: lat, longitude: lng, accuracy, speed: rawSpeed } = position.coords;
+    if (accuracy && accuracy > 50) return; // ignore poor fix
+
+    let speedKmh = 0;
+    if (rawSpeed !== null && !isNaN(rawSpeed) && rawSpeed > 0) {
+      speedKmh = rawSpeed * 3.6;
+    }
+
+    if (speedKmh >= this.AUTO_START_THRESHOLD_KMH) {
+      this.autoDetectConsecutive++;
+      this.autoDetectBufferedPoints.push({ lat, lng, speedKmh, ts: Date.now() });
+
+      if (this.autoDetectConsecutive >= this.AUTO_START_CONSECUTIVE) {
+        // Confirmed motion — auto-start trip
+        this._autoStartTrip();
+      }
+    } else {
+      // Reset consecutive counter if speed drops
+      this.autoDetectConsecutive = 0;
+      this.autoDetectBufferedPoints = [];
+    }
+  }
+
+  _autoStartTrip() {
+    const vehicle = this.autoDetectVehicle || { id: 'unknown', model: 'Véhicule', type: 'car', emoji: '🚗' };
+
+    // Stop passive watcher — startRealTracking will open its own active watcher
+    this.stopPassiveAutoDetection();
+
+    const started = this.startRealTracking(vehicle);
+    if (started) {
+      // Replay buffered points so the beginning of trip is not lost
+      for (const pt of this.autoDetectBufferedPoints) {
+        this.recordPoint(pt.lat, pt.lng, pt.speedKmh);
+      }
+      this.autoDetectBufferedPoints = [];
+      if (this.onAutoTripDetected) this.onAutoTripDetected(vehicle);
+    }
+  }
+
+  _startAutoStopTimer() {
+    this._clearAutoStopTimer();
+    this.autoStopTimer = setTimeout(() => {
+      if (this.isTracking) {
+        this.stopTracking();
+      }
+    }, this.AUTO_STOP_MS);
+  }
+
+  _clearAutoStopTimer() {
+    if (this.autoStopTimer) {
+      clearTimeout(this.autoStopTimer);
+      this.autoStopTimer = null;
     }
   }
 
@@ -302,8 +398,12 @@ export class TrackerEngine {
         if (this.onLocationUpdate) {
           this.onLocationUpdate(this.lastLat, this.lastLng, 0, this.currentTrip ? this.currentTrip.path : [], stationaryHeading);
         }
+        // Start auto-stop countdown when stationary
+        this._startAutoStopTimer();
         return;
       }
+      // Moving — cancel any auto-stop countdown
+      this._clearAutoStopTimer();
 
       // User is moving: compute forward bearing or use device compass
       if (devHeading !== null && !isNaN(devHeading) && devHeading >= 0 && speedKmh > 3) {
@@ -358,6 +458,8 @@ export class TrackerEngine {
     this.isTracking = false;
     this.isSimulating = false;
 
+    this._clearAutoStopTimer();
+
     if (this.simulationTimer) {
       clearInterval(this.simulationTimer);
       this.simulationTimer = null;
@@ -378,6 +480,11 @@ export class TrackerEngine {
 
     if (this.onTripEnd && completedTrip) {
       this.onTripEnd(completedTrip);
+    }
+
+    // Redémarrer l'auto-détection passive après la fin du trajet
+    if (this.autoDetectVehicle && this.autoDetectWatchId === null) {
+      setTimeout(() => this.startPassiveAutoDetection(this.autoDetectVehicle), 3000);
     }
 
     return completedTrip;

@@ -625,6 +625,7 @@ body.in-drive-mode #btnStartRealDrive:hover {
   justify-content: center;
   color: var(--text-muted);
   transition: all var(--transition-fast);
+  position: relative; /* needed for ::after badge */
 }
 
 .btn-header-icon:hover {
@@ -635,6 +636,29 @@ body.in-drive-mode #btnStartRealDrive:hover {
 #btnForceRefreshCache.is-spinning svg {
   animation: spinCacheRefresh 0.8s linear infinite;
   color: var(--accent-blue);
+}
+
+/* Bouton MAJ: état mise à jour disponible */
+#btnForceRefreshCache.update-available {
+  background: rgba(16, 185, 129, 0.2) !important;
+  border-color: rgba(16, 185, 129, 0.6) !important;
+  color: #10b981 !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+  animation: updatePulse 1.8s ease-in-out infinite;
+}
+
+#btnForceRefreshCache.update-available::after {
+  content: '🆕';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+@keyframes updatePulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(16, 185, 129, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(16, 185, 129, 0.7); }
 }
 
 @keyframes spinCacheRefresh {
@@ -2168,7 +2192,7 @@ button:focus-visible {
   margin-top: 6px;
 }
 
-/* Vertical Cluster fallback (when toggled or narrow portrait) */
+/* Vertical Cluster (portrait toggle or narrow portrait auto) */
 .drive-3d-cockpit.vertical-cluster .cockpit-cluster-body {
   flex-direction: column;
   justify-content: flex-end;
@@ -2189,6 +2213,30 @@ button:focus-visible {
 
 .drive-3d-cockpit.vertical-cluster .telemetry-pill-card .t-num {
   font-size: 16px;
+}
+
+/* Horizontal cluster: compteur à gauche, road au centre, télémétrie à droite */
+.drive-3d-cockpit.horizontal-cluster:not(.vertical-cluster) .cockpit-cluster-body {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.drive-3d-cockpit.horizontal-cluster:not(.vertical-cluster) .cluster-left-gauge {
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.drive-3d-cockpit.horizontal-cluster:not(.vertical-cluster) .cluster-right-telemetry {
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  width: auto !important;
+}
+
+.drive-3d-cockpit.horizontal-cluster:not(.vertical-cluster) .cluster-center-road {
+  display: block;
+  flex: 1;
 }
 
 /* ==========================================================================
@@ -2348,6 +2396,92 @@ button:focus-visible {
   margin-top: 18px;
 }
 
+/* Toggle switch row (Auto-démarrage GPS) */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.toggle-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.toggle-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggle-row-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.toggle-row-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.toggle-switch-wrap {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle-checkbox {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: background 0.25s ease;
+  cursor: pointer;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1), background 0.25s ease;
+}
+
+.toggle-checkbox:checked + .toggle-slider {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.toggle-checkbox:checked + .toggle-slider::before {
+  transform: translateY(-50%) translateX(20px);
+  background: #ffffff;
+}
+
+
+
 .btn-primary-action {
   width: 100%;
   background: var(--accent-blue);
@@ -2445,7 +2579,9 @@ button:focus-visible {
   }
 
   .header-extra-btn {
-    display: none !important;
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
   }
 
   .gps-status-badge {
@@ -2580,8 +2716,8 @@ button:focus-visible {
   }
 
   /* In portrait, stack speedometer and telemetry vertically so nothing is cut off */
-  .drive-3d-cockpit .cockpit-cluster-body,
-  .drive-3d-cockpit.horizontal-cluster .cockpit-cluster-body {
+  .drive-3d-cockpit.vertical-cluster .cockpit-cluster-body,
+  .drive-3d-cockpit:not(.horizontal-cluster) .cockpit-cluster-body {
     flex-direction: column !important;
     justify-content: flex-end !important;
     align-items: center !important;
@@ -2618,6 +2754,26 @@ button:focus-visible {
     width: 100% !important;
   }
 
+  /* En landscape sur mobile: garder layout horizontal avec compteur à gauche */
+  @media (orientation: landscape) {
+    .drive-3d-cockpit.horizontal-cluster:not(.vertical-cluster) .cockpit-cluster-body {
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding-bottom: max(8px, env(safe-area-inset-bottom, 8px)) !important;
+    }
+
+    .drive-3d-cockpit.horizontal-cluster:not(.vertical-cluster) .cluster-right-telemetry {
+      flex-direction: column !important;
+      width: auto !important;
+      gap: 6px !important;
+    }
+
+    .drive-3d-cockpit.horizontal-cluster:not(.vertical-cluster) .cluster-center-road {
+      display: block;
+    }
+  }
+
   .telemetry-pill-card {
     flex: 1;
     min-width: 0;
@@ -2642,26 +2798,42 @@ button:focus-visible {
   }
 }
 
-/* Extra small mobile screens (width <= 420px) */
+/* Extra small mobile screens (width <= 420px, ex: Pixel 6/7/8 @ 393-412px) */
 @media (max-width: 420px) {
   .app-header {
-    padding: 0 8px;
+    padding: 0 6px;
+    gap: 3px;
+  }
+
+  .header-left {
     gap: 4px;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  /* Cacher le nom "DFWDrive" pour ne conserver que l'éclair + sélecteur véhicule */
+  .brand-title {
+    display: none;
+  }
+
+  .brand-glow-icon {
+    font-size: 20px;
   }
 
   .header-right {
-    gap: 4px;
+    gap: 3px;
+    flex-shrink: 0;
   }
 
   .active-vehicle-pill {
-    padding: 3px 6px;
-    gap: 4px;
-    max-width: 105px;
+    padding: 3px 5px;
+    gap: 3px;
+    max-width: 90px;
   }
 
   .active-vehicle-pill .veh-name {
-    max-width: 52px;
-    font-size: 10.5px;
+    max-width: 44px;
+    font-size: 10px;
   }
 
   .vehicle-dropdown-menu {
@@ -2675,25 +2847,36 @@ button:focus-visible {
   }
 
   .gps-status-badge {
-    padding: 6px;
+    padding: 5px;
     border-radius: 50%;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     justify-content: center;
   }
 
   .btn-header-action.primary {
-    padding: 6px 8px;
-    font-size: 11.5px;
-    height: 32px;
+    padding: 5px 7px;
+    font-size: 11px;
+    height: 30px;
+    gap: 3px;
   }
 
   .btn-profile-badge,
   .btn-header-icon {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+  }
+
+  /* Garder le bouton MAJ visible mais compact sur Pixel */
+  .header-extra-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
   }
 }
+
+
 
 /* Horizontal-first Cockpit Optimizations for Landscape (Mobile or Desktop) */
 @media (orientation: landscape) and (max-height: 550px) {

@@ -8,8 +8,10 @@ export const DEFAULT_USER_PROFILE = {
   tag: "@pilote",
   avatar: "🏎️",
   units: "kmh", // Default: metric (km, km/h, m)
-  bio: "Enregistrement automatique de chaque kilomètre."
+  bio: "Enregistrement automatique de chaque kilomètre.",
+  autoStartDrives: true // Auto-détection de trajet activée par défaut
 };
+
 
 export const INITIAL_VEHICLES = [
   {

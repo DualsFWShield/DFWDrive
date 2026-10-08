@@ -55,12 +55,32 @@ document.addEventListener('DOMContentLoaded', () => {
           lastHeading = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
         }
         mapCtrl.updateLiveLocation(lat, lng, lastHeading, speed, path);
+      },
+      onAutoTripDetected: (vehicle) => {
+        if (uiCtrl) {
+          uiCtrl.onAutoTripStart(vehicle);
+        }
       }
     });
 
   // Initialize UI Controller
   uiCtrl = new UIController(mapCtrl, trackerEngine);
   uiCtrl.init();
+
+  // Auto-detection passive: démarrer GPS en arrière-plan si autoStartDrives activé
+  const activeVeh = StorageService.getActiveVehicle();
+  if (activeVeh) {
+    const profile = StorageService.getProfile();
+    if (profile.autoStartDrives !== false) {
+      // Demander la permission GPS et activer l'auto-détection silencieuse
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          () => trackerEngine.startPassiveAutoDetection(activeVeh),
+          (err) => console.info('Auto-detect GPS permission pending:', err.message)
+        );
+      }
+    }
+  }
 
   // Connect map zoom changes to 3D vehicle road scale
   mapCtrl.onZoomChange = (zoom) => {
@@ -73,12 +93,42 @@ document.addEventListener('DOMContentLoaded', () => {
   const initialDrives = StorageService.getDrives();
   mapCtrl.renderHeatmap(initialDrives);
 
-  // Register Progressive Web App (PWA) Service Worker
+  // Register Progressive Web App (PWA) Service Worker + Auto-Update
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(
-      (reg) => console.log('DFWDrive PWA Service Worker active:', reg.scope),
-      (err) => console.warn('Service Worker registration skipped:', err)
-    );
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      console.log('DFWDrive PWA Service Worker active:', reg.scope);
+
+      // Vérifier une mise à jour disponible dès le lancement
+      reg.update().catch(() => {});
+
+      // Nouvelle version détectée pendant l'exécution
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Mettre à jour le bouton MAJ pour indiquer une mise à jour disponible
+            const btnRefresh = document.getElementById('btnForceRefreshCache');
+            if (btnRefresh) {
+              btnRefresh.classList.add('update-available');
+              btnRefresh.title = '🆕 Mise à jour disponible — Cliquer pour appliquer';
+            }
+            if (uiCtrl) {
+              uiCtrl.showToast('🆕 Mise à jour disponible ! Appuyez sur MAJ pour recharger.');
+            }
+          }
+        });
+      });
+    }).catch((err) => console.warn('Service Worker registration skipped:', err));
+
+    // Recharger automatiquement quand le SW prend le contrôle (après update)
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
   }
 
   // Handle Force Cache Refresh & Update

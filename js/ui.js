@@ -190,6 +190,13 @@ export class UIController {
       }
     });
 
+    // Réappliquer la disposition cockpit lors d'un changement d'orientation
+    window.matchMedia('(orientation: landscape)').addEventListener('change', () => {
+      if (this.tracker && this.tracker.isTracking) {
+        this._applyOrientationLayout();
+      }
+    });
+
     // Start / Stop Real Drive
     const btnStartReal = document.getElementById('btnStartRealDrive');
     if (btnStartReal) {
@@ -247,7 +254,8 @@ export class UIController {
           tag: document.getElementById('profileTag').value.trim() || '@driver',
           avatar: this.selectedAvatarEmoji,
           units: document.getElementById('profileUnits').value,
-          bio: document.getElementById('profileBio').value.trim()
+          bio: document.getElementById('profileBio').value.trim(),
+          autoStartDrives: document.getElementById('profileAutoStart')?.checked ?? true
         };
         StorageService.saveProfile(profile);
         this.loadProfile();
@@ -512,6 +520,10 @@ export class UIController {
     document.getElementById('profileUnits').value = profile.units || 'kmh';
     document.getElementById('profileBio').value = profile.bio || '';
 
+    // Toggle auto-start
+    const autoStartEl = document.getElementById('profileAutoStart');
+    if (autoStartEl) autoStartEl.checked = profile.autoStartDrives !== false;
+
     this.selectedAvatarEmoji = profile.avatar || '🏎️';
     const preview = document.getElementById('profileAvatarPreview');
     if (preview) preview.textContent = this.selectedAvatarEmoji;
@@ -631,12 +643,68 @@ export class UIController {
       if (this.tripDrawer) this.tripDrawer.classList.remove('is-open');
       document.body.classList.remove('drawer-open');
       document.body.classList.add('in-drive-mode');
+      // Appliquer la disposition selon l'orientation courante
+      this._applyOrientationLayout();
     } else {
       this.driveCockpit.classList.remove('is-active');
       this.toggleMainPanel(false);
       document.body.classList.remove('in-drive-mode');
     }
   }
+
+  /**
+   * Appelé automatiquement par l'auto-détection quand un trajet démarre.
+   */
+  onAutoTripStart(vehicle) {
+    this.toggleCockpit(true);
+    this.map.setDriveMode(true);
+    this.update3DVehicleModel();
+    this.updateGpsStatus(true, 'Enregistrement 3D');
+
+    const badgeEl = document.getElementById('gpsStatusBadge');
+    if (badgeEl) {
+      badgeEl.style.display = 'none';
+      badgeEl.classList.add('is-hidden');
+    }
+
+    const btnStart = document.getElementById('btnStartRealDrive');
+    if (btnStart) {
+      btnStart.classList.add('is-recording');
+      btnStart.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="4" y="4" width="16" height="16" rx="3"/>
+        </svg>
+        <span id="btnStartDriveLabel">Arrêter</span>
+      `;
+    }
+    this.showToast(`🚗 Trajet détecté automatiquement — Enregistrement démarré`);
+  }
+
+  /**
+   * Applique la disposition horizontale (compteur à gauche) ou portrait
+   * selon l'orientation réelle de l'écran.
+   */
+  _applyOrientationLayout() {
+    if (!this.driveCockpit) return;
+    const isLandscape = window.matchMedia('(orientation: landscape)').matches;
+    if (isLandscape) {
+      this.driveCockpit.classList.remove('vertical-cluster');
+      this.driveCockpit.classList.add('horizontal-cluster');
+      const icon = document.getElementById('layoutToggleIcon');
+      const label = document.getElementById('layoutToggleLabel');
+      if (icon) icon.textContent = '🔄';
+      if (label) label.textContent = 'Mode Portrait';
+    } else {
+      this.driveCockpit.classList.add('vertical-cluster');
+      this.driveCockpit.classList.remove('horizontal-cluster');
+      const icon = document.getElementById('layoutToggleIcon');
+      const label = document.getElementById('layoutToggleLabel');
+      if (icon) icon.textContent = '↔️';
+      if (label) label.textContent = 'Mode Paysage';
+    }
+  }
+
+
 
   update3DVehicleModel() {
     const activeVeh = StorageService.getActiveVehicle();
