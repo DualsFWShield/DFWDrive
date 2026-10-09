@@ -38,6 +38,8 @@ export class Vehicle3DRenderer {
     this.loadedPacks = {};
     this.loadingPromises = {};
     this.currentZoom = 17.5;
+    this.currentHeading = 0;
+    this.currentMapBearing = 0;
     this.baseNormScale = TARGET_CAR_LENGTH / 3.4;
   }
 
@@ -151,6 +153,7 @@ export class Vehicle3DRenderer {
         this.buildMotorcycleModel(colorHex);
       }
       this.updateScaleForZoom(this.currentZoom || 17.5);
+      if (this.currentHeading !== undefined) this.setHeading(this.currentHeading, this.currentMapBearing);
       this.scene.add(this.vehicleGroup);
       return;
     }
@@ -159,6 +162,7 @@ export class Vehicle3DRenderer {
     this.baseNormScale = TARGET_CAR_LENGTH / 3.4;
     this.buildCarModel(colorHex);
     this.updateScaleForZoom(this.currentZoom || 17.5);
+    if (this.currentHeading !== undefined) this.setHeading(this.currentHeading, this.currentMapBearing);
     this.scene.add(this.vehicleGroup);
 
     // Asynchronously load real 3D model from user GLB pack
@@ -230,6 +234,7 @@ export class Vehicle3DRenderer {
     this.vehicleGroup = wrapper;
     this.wheels = foundWheels;
     this.updateScaleForZoom(this.currentZoom || 17.5);
+    if (this.currentHeading !== undefined) this.setHeading(this.currentHeading, this.currentMapBearing);
     this.scene.add(this.vehicleGroup);
   }
 
@@ -294,6 +299,7 @@ export class Vehicle3DRenderer {
     this.vehicleGroup = wrapper;
     this.wheels = foundWheels;
     this.updateScaleForZoom(this.currentZoom || 17.5);
+    if (this.currentHeading !== undefined) this.setHeading(this.currentHeading, this.currentMapBearing);
     this.scene.add(this.vehicleGroup);
   }
 
@@ -512,6 +518,38 @@ export class Vehicle3DRenderer {
   setSteering(turnDeltaDegrees) {
     const targetLean = THREE.MathUtils.clamp(turnDeltaDegrees * 0.02, -0.22, 0.22);
     this.currentTurnAngle += (targetLean - this.currentTurnAngle) * 0.1;
+  }
+
+  /**
+   * Oriente le modèle 3D selon le cap GPS par rapport à la rotation de la carte
+   */
+  setHeading(headingDegrees, mapBearing = 0) {
+    if (headingDegrees === null || headingDegrees === undefined || isNaN(headingDegrees)) return;
+    this.currentHeading = headingDegrees;
+    this.currentMapBearing = mapBearing || 0;
+    const screenAngleDeg = (headingDegrees - (mapBearing || 0));
+    const screenAngleRad = screenAngleDeg * (Math.PI / 180);
+    if (this.vehicleGroup) {
+      this.vehicleGroup.rotation.y = -screenAngleRad;
+    }
+  }
+
+  /**
+   * Ajuste l'inclinaison de caméra 3D pour correspondre au pitch de la carte
+   * (conserve une vue 3D dynamique de 30° min même quand la carte est à plat)
+   */
+  setCameraPitch(mapPitch = 60) {
+    const effectivePitch = Math.max(30, Math.min(65, mapPitch));
+    const pitchRad = effectivePitch * (Math.PI / 180);
+    const dist = 6.364; // Distance focale de référence
+    if (this.camera) {
+      this.camera.position.set(
+        0,
+        dist * Math.cos(pitchRad),
+        dist * Math.sin(pitchRad)
+      );
+      this.camera.lookAt(0, 0, 0);
+    }
   }
 
   animate() {

@@ -562,20 +562,9 @@ body.in-drive-mode #btnStartRealDrive:hover {
   pointer-events: none;
 }
 
-/* Central Vehicle Chassis Core */
+/* Central Vehicle Chassis Core - hidden so real 3D vehicle model takes center stage */
 .puck-core-chassis {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #182236 0%, #0a0e17 100%);
-  border: 2px solid #00f0ff;
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.6), 0 4px 14px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0, 240, 255, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3;
-  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+  display: none !important;
 }
 
 /* Vector Vehicle Silhouette Inside Puck */
@@ -2792,7 +2781,6 @@ button:focus-visible {
   }
 
   .vehicle-3d-viewport {
-    top: 40%;
     width: 260px;
     height: 200px;
   }

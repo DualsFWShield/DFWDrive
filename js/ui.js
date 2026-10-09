@@ -32,6 +32,7 @@ export class UIController {
     this.cacheDOMElements();
     this.bindEvents();
     this.vehicle3d.init();
+    this.update3DVehicleModel();
     this.loadProfile();
     this.populateHeaderVehicles();
     this.renderDrivesList();

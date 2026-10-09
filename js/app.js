@@ -82,9 +82,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Connect map zoom changes to 3D vehicle road scale
+  // Connect map zoom and camera transformations to 3D vehicle
   mapCtrl.onZoomChange = (zoom) => {
     if (uiCtrl && uiCtrl.vehicle3d) {
+      uiCtrl.vehicle3d.updateScaleForZoom(zoom);
+    }
+  };
+
+  mapCtrl.onVehicleTransformChange = ({ heading, bearing, pitch, zoom }) => {
+    if (uiCtrl && uiCtrl.vehicle3d) {
+      uiCtrl.vehicle3d.setHeading(heading, bearing);
+      uiCtrl.vehicle3d.setCameraPitch(pitch);
       uiCtrl.vehicle3d.updateScaleForZoom(zoom);
     }
   };

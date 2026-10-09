@@ -55,6 +55,8 @@ export class MapController {
     // Synchronize 3D vehicle screen position continuously to keep it locked to road coordinates
     this.map.on('move', () => this.syncVehicleScreenPosition());
     this.map.on('render', () => this.syncVehicleScreenPosition());
+    this.map.on('rotate', () => this.syncVehicleScreenPosition());
+    this.map.on('pitch', () => this.syncVehicleScreenPosition());
 
     // Notify listeners when map zooms so 3D vehicle can dynamically match road scale
     this.map.on('zoom', () => {
@@ -605,12 +607,21 @@ export class MapController {
 
   syncVehicleScreenPosition() {
     if (!this.map) return;
-    const coord = this.currentVehicleCoord || this.map.getCenter();
+    const coord = this.currentVehicleCoord || (this.userLocation ? [this.userLocation.lng, this.userLocation.lat] : this.map.getCenter());
     const pt = this.map.project(coord);
     const container = document.getElementById('vehicle3dContainer');
     if (container) {
       container.style.left = `${Math.round(pt.x)}px`;
       container.style.top = `${Math.round(pt.y)}px`;
+    }
+
+    if (typeof this.onVehicleTransformChange === 'function') {
+      this.onVehicleTransformChange({
+        heading: this.currentHeading || 0,
+        bearing: this.map.getBearing() || 0,
+        pitch: this.map.getPitch() || 0,
+        zoom: this.map.getZoom() || 17.5
+      });
     }
   }
 

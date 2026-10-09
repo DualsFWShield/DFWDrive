@@ -3,7 +3,7 @@
  * Provides offline caching, lightning-fast boot times, and home-screen installation.
  */
 
-const CACHE_NAME = 'dfwdrive-cache-v9';
+const CACHE_NAME = 'dfwdrive-cache-v10';
 
 const STATIC_ASSETS = [
   './',

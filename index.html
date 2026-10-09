@@ -44,6 +44,8 @@
     <!-- 3D Map Container -->
     <div class="map-container">
       <div id="leafletMap"></div>
+      <!-- 3D Vehicle Viewport (Three.js overlay, always active on road) -->
+      <div class="vehicle-3d-viewport" id="vehicle3dContainer"></div>
     </div>
 
     <!-- Top Navigation Header -->
@@ -439,9 +441,6 @@
 
     <!-- 3D LIVE DRIVE COCKPIT (Horizontal-first cluster, 3D Map & Vehicle, Cyber Gauge) -->
     <div class="drive-3d-cockpit horizontal-cluster" id="drive3dCockpit">
-
-      <!-- 3D Simplified Vehicle Canvas (Three.js overlay positioned on road) -->
-      <div class="vehicle-3d-viewport" id="vehicle3dContainer"></div>
 
       <!-- Top Driving HUD Status -->
       <div class="cockpit-top-bar">
