@@ -13,6 +13,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VEHICLE_3D_CATALOG } from './data.js';
 
+// Échelle réaliste calibrée sur la largeur réelle des voies MapLibre (zoom 17.5)
+// Longueur voiture ~1.10 unités 3D -> ~52px de longueur et ~25px de largeur à l'écran,
+// s'intégrant parfaitement dans les rues (~28-35px) sans déborder sur les bâtiments.
+const TARGET_CAR_LENGTH = 1.10;
+const TARGET_MOTO_LENGTH = 0.55;
+const TARGET_BIKE_LENGTH = 0.45;
+
 export class Vehicle3DRenderer {
   constructor(canvasContainerId = 'vehicle3dContainer') {
     this.container = document.getElementById(canvasContainerId);
@@ -31,7 +38,7 @@ export class Vehicle3DRenderer {
     this.loadedPacks = {};
     this.loadingPromises = {};
     this.currentZoom = 17.5;
-    this.baseNormScale = 1.0;
+    this.baseNormScale = TARGET_CAR_LENGTH / 3.4;
   }
 
   init() {
@@ -137,10 +144,10 @@ export class Vehicle3DRenderer {
     // Procedural bike or motorcycle
     if (info.pack === 'procedural' || info.type === 'bike' || info.type === 'motorcycle') {
       if (info.type === 'bike') {
-        this.baseNormScale = 0.65;
+        this.baseNormScale = TARGET_BIKE_LENGTH / 1.8;
         this.buildBicycleModel(colorHex);
       } else {
-        this.baseNormScale = 0.75;
+        this.baseNormScale = TARGET_MOTO_LENGTH / 2.2;
         this.buildMotorcycleModel(colorHex);
       }
       this.updateScaleForZoom(this.currentZoom || 17.5);
@@ -149,7 +156,7 @@ export class Vehicle3DRenderer {
     }
 
     // Immediately render sleek procedural placeholder while 3D file loads
-    this.baseNormScale = 1.0;
+    this.baseNormScale = TARGET_CAR_LENGTH / 3.4;
     this.buildCarModel(colorHex);
     this.updateScaleForZoom(this.currentZoom || 17.5);
     this.scene.add(this.vehicleGroup);
@@ -196,9 +203,9 @@ export class Vehicle3DRenderer {
 
     wrapper.updateMatrixWorld(true);
 
-    // Normalize length to ~3.6 road units
+    // Normalize length to ~1.10 road units (matches real road lane width)
     const maxDim = Math.max(size.x, size.z);
-    this.baseNormScale = maxDim > 0 ? (3.6 / maxDim) : 0.0075;
+    this.baseNormScale = maxDim > 0 ? (TARGET_CAR_LENGTH / maxDim) : 0.0023;
 
     // Wheels & Tires identification
     const foundWheels = [];
@@ -268,9 +275,9 @@ export class Vehicle3DRenderer {
     });
     wrapper.updateMatrixWorld(true);
 
-    // Normalize length to ~3.6 units
+    // Normalize length to ~1.10 units
     const maxDim = Math.max(size.x, size.z);
-    this.baseNormScale = maxDim > 0 ? (3.6 / maxDim) : 0.0063;
+    this.baseNormScale = maxDim > 0 ? (TARGET_CAR_LENGTH / maxDim) : 0.0020;
 
     wrapper.traverse((child) => {
       if (child.isMesh) {
